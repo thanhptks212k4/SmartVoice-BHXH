@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  xtts_worker_1:
+    build: .
+    image: thanhpt/xtts_worker:latest
+    container_name: xtts_worker_1
+    environment:
+      - REDIS_HOST=172.28.251.191
+      - REDIS_PORT=6379
+      - EXTERNAL_HOST=172.28.251.191
+      - EXTERNAL_PORT=8080
+      - QUEUE_MAXSIZE=10
+      - STREAM_GET_TIMEOUT=30.0
+      - QUEUE_PUT_TIMEOUT=5.0
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./model:/app/model
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+

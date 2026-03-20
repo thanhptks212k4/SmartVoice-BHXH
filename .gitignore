@@ -1,0 +1,59 @@
+# ======================
+# Node
+# ======================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# Python
+# ======================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ======================
+# Environment
+# ======================
+.env
+.env.*
+*.env
+
+# ======================
+# System / IDE
+# ======================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ======================
+# Build / temp
+# ======================
+dist/
+build/
+tmp/
+temp/
+*.log
+
+# ======================
+# Data (VERY IMPORTANT)
+# ======================
+qdrant_data/
+uploads/
+**/uploads/**
+
+# ======================
+# Docker
+# ======================
+*.pid
+*.sock
+
+# ======================
+# Misc
+# ======================
+*.sqlite3
+*.db
+client/rnnoise/

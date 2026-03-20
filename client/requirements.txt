@@ -1,0 +1,14 @@
+websocket-client
+pyaudio
+requests
+webrtcvad
+samplerate
+scipy
+pydub
+numpy==1.26.4
+sounddevice==0.4.6
+SpeechRecognition==3.10.1
+torch==2.2.1
+scipy==1.12.0
+torchaudio
+

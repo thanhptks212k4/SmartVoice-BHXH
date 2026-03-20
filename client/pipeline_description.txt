@@ -1,0 +1,266 @@
+================================================================================
+              VOICE AI PIPELINE — MÔ TẢ LUỒNG HOẠT ĐỘNG (v7)
+================================================================================
+
+Kiến trúc: Producer-Consumer 2 Thread + Main Thread
+
+  mic_worker (Thread 1) → audio_queue → stt_worker (Thread 2) → text_queue → main thread
+
+Shared state giữa các thread:
+  - audio_queue    : Queue chứa audio segments (numpy float32 16kHz)
+  - text_queue     : Queue chứa (text, latency) từ STT
+  - voice_timer    : Thời điểm cuối cùng phát hiện giọng nói
+  - stt_busy       : Event, set khi STT đang xử lý
+  - mic_recording  : Event, set khi capture_audio đang thu âm giọng nói
+  - stop_event     : Event, set khi thoát chương trình
+
+
+================================================================================
+1. INPUT — Thu âm từ Microphone
+================================================================================
+
+Nguồn thu     : Microphone của thiết bị qua thư viện sounddevice
+Lớp thu âm   : MicStream — mở InputStream 1 lần duy nhất (persistent),
+                callback đẩy audio vào queue nội bộ
+
+Định dạng     : Mono (1 kênh), tần số lấy mẫu 48,000 Hz (native)
+Kích thước    : Mỗi block dài 20ms = 960 samples (MIC_BLOCKSIZE)
+Queue         : Tối đa 150 block (~3 giây audio)
+
+Pre-buffer    : Ring buffer 15 block (~300ms), giữ audio trước khi
+                phát hiện giọng nói để không mất phần đầu câu
+
+
+================================================================================
+2. XỬ LÝ AUDIO — Lọc nhiễu + VAD
+================================================================================
+
+Mỗi block 960 samples (48kHz) đi qua 3 lớp xử lý:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Lớp 1 — Highpass Filter                                           │
+│   Cắt tần số < 80Hz (DC offset, rumble) bằng scipy.signal.butter  │
+│   Bậc 2, state liên tục giữa các frame (lfilter với zi)           │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Lớp 2 — RNNoise (khử ồn bằng neural network)                     │
+│   Xử lý native tại 48kHz, mỗi block = 2 frame × 480 samples      │
+│   Dùng thư viện C (librnnoise.so) qua ctypes                      │
+│   Buffer cố định (zero-alloc): _rnn_in, _rnn_out, _rnn_result     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Downsample 48kHz → 16kHz                                          │
+│   Bằng slicing [::3] thay vì resample_poly → tiết kiệm CPU       │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Lớp 3 — VAD (Voice Activity Detection)                            │
+│                                                                    │
+│ Hai tín hiệu kết hợp, frame chỉ là "speech" khi cả 2 thỏa:      │
+│                                                                    │
+│   Tiêu chí        Điều kiện                                       │
+│   ─────────────   ──────────────────────────────────────────       │
+│   Silero VAD      prob > 0.5 (model PyTorch snakers4/silero-vad)  │
+│   Energy VAD      rms > max(noise_floor × 1.5, 0.003)             │
+│                                                                    │
+│ Noise floor tự cập nhật: noise = 0.95 × noise + 0.05 × rms       │
+│ (chỉ cập nhật khi frame không phải speech)                        │
+│                                                                    │
+│ Silero VAD gom 512 samples (32ms) trước khi chạy model            │
+│                                                                    │
+│ Dominance voting: cửa sổ trượt 10 frame, cần > 30% là speech     │
+│ để xác nhận có giọng nói                                          │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+3. ĐIỀU KIỆN DỪNG GHI ÂM (capture_audio)
+================================================================================
+
+Điều kiện                       Timeout     Kết quả
+──────────────────────────────  ──────────  ────────────────────────────────
+Không phát hiện giọng nói       10 giây     Trả về "__NO_VOICE__"
+Im lặng sau khi nói             0.8 giây    Dừng ghi, trả về audio (break)
+Nói liên tục quá 15 giây        15 giây     Push audio vào audio_queue,
+                                            reset audio_frames,
+                                            tiếp tục thu âm (KHÔNG break)
+
+Khi đạt 15s: audio hiện tại được gửi trực tiếp vào audio_queue để STT xử lý
+ngay, đồng thời capture_audio tiếp tục ghi âm phần tiếp theo mà không gián
+đoạn. voice_timer và recording_flag được cập nhật tương ứng.
+
+
+================================================================================
+4. THREAD 1 — mic_worker (Producer)
+================================================================================
+
+Vòng lặp:
+  1. Gọi capture_audio() — block cho đến khi có audio hoặc __NO_VOICE__
+  2. Nếu __NO_VOICE__: sleep 0.5s rồi lặp lại
+  3. Nếu có audio:
+     a. voice_timer.touch()  — cập nhật thời gian giọng nói cuối
+     b. audio_queue.put()    — đẩy audio vào queue cho stt_worker
+        (nếu queue đầy: bỏ phần tử cũ nhất, put lại)
+
+capture_audio cũng có thể push trực tiếp vào audio_queue khi đạt 15s
+(không qua mic_worker) để giảm latency.
+
+
+================================================================================
+5. THREAD 2 — stt_worker (Consumer)
+================================================================================
+
+Vòng lặp:
+  1. Lấy audio từ audio_queue (timeout 1s)
+  2. stt_busy.set()  — báo hiệu đang xử lý
+  3. Chuyển đổi audio:
+     a. numpy float32 → PCM int16
+     b. Ghi vào WAV in-memory (1 kênh, 16-bit, 16kHz)
+     c. Gọi Google Web Speech API (recognize_google, ngôn ngữ vi-VN)
+  4. Nếu có text: đẩy (text, latency) vào text_queue
+  5. stt_busy.clear()  — báo hiệu đã xong (trong finally)
+
+Xử lý lỗi:
+  - UnknownValueError: bỏ qua (không nhận diện được)
+  - RequestError: in lỗi kết nối
+
+
+================================================================================
+6. MAIN THREAD — Endpoint Detection (v7)
+================================================================================
+
+Đọc text từ text_queue (poll 0.1s) và xử lý qua 7 bước theo thứ tự ưu tiên:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 1: Filler Filtering                                          │
+│   Loại bỏ từ rác tiếng Việt: ờ, à, ừ, ừm, ạ, ơ, ơi, ê, hả,     │
+│   uhm, um, ah, uh, eh                                             │
+│   Nếu toàn filler → bỏ qua, không xử lý tiếp                    │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 2: STT Dedup                                                 │
+│   Nếu text giống hệt lần STT trước → bỏ qua                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 3: Text Extension Merge                                      │
+│   Nếu text mới mở rộng text cuối trong buffer                    │
+│   (VD: "xin chào" → "xin chào bạn")                              │
+│   → replace thay vì append, tránh phân mảnh câu                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 4: Punctuation Detection                                     │
+│   Text kết thúc bằng . ? ! → finalize ngay                       │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 5: Keyword Endpoint                                          │
+│   Text kết thúc bằng: xong, hết, ok, được rồi, thế thôi,        │
+│   vậy thôi, cảm ơn, tạm biệt → finalize ngay                    │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 6: Text Stability                                            │
+│   Merged text giống 3 lần liên tiếp → finalize                   │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ Step 7: Dynamic Silence — 5-Guard Check                           │
+│                                                                    │
+│ Tất cả 5 điều kiện phải thỏa trước khi finalize:                 │
+│                                                                    │
+│   Guard           Điều kiện              Mục đích                 │
+│   ──────────────  ─────────────────────  ────────────────────────  │
+│   1. stt_busy     = False                STT đã idle              │
+│   2. audio_queue  = empty                Không còn audio chờ      │
+│   3. mic_recording= False                Mic không đang thu       │
+│   4. text_age     > threshold (>6 từ)    Không vừa nhận text      │
+│   5. voice_timer  > threshold            Mic im lặng đủ lâu      │
+│                                                                    │
+│ Dynamic silence threshold theo word count:                        │
+│                                                                    │
+│   Số từ       Threshold     Ví dụ                                 │
+│   ─────────   ──────────    ──────────────────────                 │
+│   1–3 từ      1.2 giây      "mở quạt", "bật đèn"                 │
+│   4–6 từ      1.6 giây      "thời tiết hôm nay"                  │
+│   7–10 từ     2.0 giây      câu trung bình                       │
+│   11–15 từ    2.5 giây      câu dài                               │
+│   16–20 từ    3.0 giây      câu rất dài                           │
+│   21–30 từ    3.5 giây      đoạn văn                              │
+│   > 30 từ     4.5 giây      giới hạn trên                        │
+│                                                                    │
+│ Connector bonus: +1.0 giây nếu câu kết thúc bằng từ nối          │
+│   (và, hoặc, nhưng, rồi, mà, hay, vì, nên, thì, còn,            │
+│    với, để, nếu, khi)                                             │
+│                                                                    │
+│ Adaptive logic cho câu dài (>6 từ):                               │
+│   effective_silence = min(voice_elapsed, text_age)                │
+│   → silence clock restart mỗi khi nhận text mới                  │
+│   → chờ thêm segments trước khi finalize                          │
+│                                                                    │
+│ Câu ngắn (≤6 từ):                                                │
+│   effective_silence = voice_elapsed                               │
+│   → phản hồi nhanh, không chờ thêm                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+7. FINALIZE SENTENCE
+================================================================================
+
+Khi bất kỳ tín hiệu endpoint nào kích hoạt:
+  1. Gộp tất cả text trong buffer thành 1 câu
+  2. Lọc filler words lần cuối
+  3. Nếu toàn filler → bỏ qua
+  4. In kết quả: ">> Cau hoan chinh [REASON]: ..."
+  5. Reset buffer và EndpointDetector state
+
+Reason có thể là: PUNCT, KEYWORD, STABLE, SILENCE, EXIT
+
+
+================================================================================
+8. TỔNG QUAN LUỒNG DỮ LIỆU
+================================================================================
+
+Mic 48kHz (persistent InputStream)
+  → Callback đẩy block 960 samples vào MicStream.queue
+  → capture_audio() lấy từ queue
+    → Highpass filter (cắt < 80Hz)
+    → RNNoise (khử ồn native 48kHz)
+    → Downsample 48k → 16k (slicing [::3])
+    → Silero VAD + Energy VAD
+    → Dominance voting (10 frame, > 30%)
+    → Nếu có giọng: thu audio, set mic_recording
+    → Nếu im lặng 0.8s: break, clear mic_recording, trả audio
+    → Nếu đạt 15s: push audio trực tiếp vào audio_queue, tiếp tục thu
+  → mic_worker đẩy audio vào audio_queue
+  → stt_worker lấy audio, set stt_busy
+    → Convert numpy → WAV in-memory
+    → Google Web Speech API (vi-VN)
+    → text_queue.put((text, latency))
+    → clear stt_busy
+  → main thread đọc text_queue
+    → EndpointDetector 7-step pipeline
+    → Finalize sentence khi đủ điều kiện
+    → Gửi lên LLM (chưa implement trong code hiện tại)
+
+
+================================================================================
+9. CÁC FILE VÀ DEPENDENCY
+================================================================================
+
+Files:
+  - STT.py    : Audio capture, noise reduction, VAD (269 dòng)
+  - client.py : STT worker, endpoint detection, main loop (381 dòng)
+
+Dependencies:
+  - numpy, sounddevice, torch, scipy
+  - speech_recognition (Google Web Speech API)
+  - librnnoise.so (C library, qua ctypes)
+  - snakers4/silero-vad (PyTorch Hub)
+
+Target platform: Raspberry Pi 5
