@@ -146,12 +146,3 @@ chatbot/
 
 kiemr tra redis
 docker exec -it redis_ai_service redis-cli MONITORdocker exec -it redis_ai_service redis-cli MONITOR
----
-
-## 👨‍💻 Tác giả
-**Duy Đỗ (doduy-AI)**  
-📧 [dev.dinhduy@gmail.com](mailto:dev.dinhduy@gmail.com)
-
----
-
-> ⭐ *Nếu bạn thấy dự án hữu ích, hãy để lại một star để ủng hộ nhé!*
