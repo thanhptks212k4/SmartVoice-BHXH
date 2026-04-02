@@ -1,8 +1,8 @@
 # core deps
 # NOTE: torch & torchaudio phải cài riêng bằng:
-#   pip install torch==2.3.1+cu118 torchaudio==2.3.1+cu118 --index-url https://download.pytorch.org/whl/cu118
-torch==2.3.1
-torchaudio==2.3.1
+#   pip install torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+torch==2.1.2
+torchaudio==2.1.2
 numpy==1.22.0;python_version<="3.10"
 numpy>=1.24.3;python_version>"3.10"
 cython>=0.29.30
@@ -50,7 +50,7 @@ bnnumerizer
 bnunicodenormalizer
 #deps for tortoise
 einops>=0.6.0
-transformers>=4.45.2
+transformers>=4.33.0,<4.40.0
 #deps for bark
 encodec>=0.1.1
 # deps for XTTS
