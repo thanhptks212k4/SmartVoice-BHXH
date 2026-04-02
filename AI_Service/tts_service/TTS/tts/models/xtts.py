@@ -69,8 +69,12 @@ def wav_to_mel_cloning(
 def load_audio(audiopath, sampling_rate):
     # better load setting following: https://github.com/faroit/python_audio_loading_benchmark
 
-    # torchaudio should chose proper backend to load audio depending on platform
-    audio, lsr = torchaudio.load(audiopath)
+    try:
+        # Use soundfile backend to avoid torchcodec/CUDA driver issues
+        audio, lsr = torchaudio.load(audiopath, backend="soundfile")
+    except Exception as e:
+        print(f"[ERROR] Failed to load audio file '{audiopath}': {e}")
+        raise RuntimeError(f"Cannot load audio '{audiopath}': {e}") from e
 
     # stereo to mono if needed
     if audio.size(0) != 1:

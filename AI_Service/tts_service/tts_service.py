@@ -2,10 +2,20 @@ import os
 import json
 import torch
 import re , time
+import logging
 from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
 import numpy as np
 import soundfile as sf
+
+# ---------- Logging setup ----------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("tts_service")
+
 output_dir = "debug_audio"
 
 # 2. Tạo thư mục nếu chưa có
@@ -46,39 +56,62 @@ VOICE_PROFILES={
 }
 
 
-
-
-print(" Đang khởi tạo mô hình XTTS...")
-
-config = XttsConfig()
-config.load_json(f"{MODEL_DIR}config.json")
-XTTS_MODEL = Xtts.init_from_config(config)
-XTTS_MODEL.load_checkpoint(
-    config,
-    checkpoint_path=f"{MODEL_DIR}model.pth",
-    vocab_path=f"{MODEL_DIR}vocab.json",
-    use_deepspeed=False
-)
-XTTS_MODEL.to(device)
-
-print("Đang trích xuất đặc trưng giọng nói...")
+# ---------- Singleton model loader ----------
+XTTS_MODEL = None
 VOICE_LATENTS = {}
-for voice_id, profile in VOICE_PROFILES.items():
-    print(f"  [{voice_id}] ← {profile['audio']}")
-    gpt_cond_latent, speaker_embedding = XTTS_MODEL.get_conditioning_latents(
-        audio_path=profile["audio"],
-        gpt_cond_len=config.gpt_cond_len,
-        max_ref_length=config.max_ref_len,
-        sound_norm_refs=config.sound_norm_refs,
-    )
-    VOICE_LATENTS[voice_id] = {
-        "gpt_cond_latent": gpt_cond_latent,
-        "speaker_embedding": speaker_embedding,
-    }
+_model_loaded = False
 
-# ----------------------------------------------
 
-print(" Mô hình XTTS đã sẵn sàng.")
+def load_model():
+    """Load XTTS model exactly once (singleton pattern).
+    Called at module import time. Subsequent calls are no-ops."""
+    global XTTS_MODEL, VOICE_LATENTS, _model_loaded
+    if _model_loaded:
+        logger.info("Model đã được load trước đó, bỏ qua.")
+        return
+
+    try:
+        logger.info("Đang khởi tạo mô hình XTTS trên device='%s'...", device)
+        config = XttsConfig()
+        config.load_json(f"{MODEL_DIR}config.json")
+        XTTS_MODEL = Xtts.init_from_config(config)
+        XTTS_MODEL.load_checkpoint(
+            config,
+            checkpoint_path=f"{MODEL_DIR}model.pth",
+            vocab_path=f"{MODEL_DIR}vocab.json",
+            use_deepspeed=False
+        )
+        XTTS_MODEL.to(device)
+        logger.info("Mô hình XTTS đã load thành công.")
+    except Exception as e:
+        logger.error("FATAL: Không thể load mô hình XTTS: %s", e, exc_info=True)
+        raise RuntimeError(f"Cannot load XTTS model: {e}") from e
+
+    try:
+        logger.info("Đang trích xuất đặc trưng giọng nói...")
+        for voice_id, profile in VOICE_PROFILES.items():
+            logger.info("  [%s] ← %s", voice_id, profile['audio'])
+            gpt_cond_latent, speaker_embedding = XTTS_MODEL.get_conditioning_latents(
+                audio_path=profile["audio"],
+                gpt_cond_len=config.gpt_cond_len,
+                max_ref_length=config.max_ref_len,
+                sound_norm_refs=config.sound_norm_refs,
+            )
+            VOICE_LATENTS[voice_id] = {
+                "gpt_cond_latent": gpt_cond_latent,
+                "speaker_embedding": speaker_embedding,
+            }
+        logger.info("Trích xuất đặc trưng giọng nói hoàn tất.")
+    except Exception as e:
+        logger.error("FATAL: Không thể trích xuất voice latents: %s", e, exc_info=True)
+        raise RuntimeError(f"Cannot extract voice latents: {e}") from e
+
+    _model_loaded = True
+    logger.info("Mô hình XTTS đã sẵn sàng.")
+
+
+# Auto-load khi import module (singleton)
+load_model()
 
 
 def split_text_smartly(text, min_words=8): 

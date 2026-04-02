@@ -110,5 +110,9 @@ audio_tensor = tts(
 
 # Lưu kết quả ra file WAV thay vì dùng IPython Display
 output_filename = "ket_qua_tts.wav"
-torchaudio.save(output_filename, audio_tensor, sample_rate=24000)
-print(f"Hoàn thành! File âm thanh đã được lưu tại: {output_filename}")
+try:
+    torchaudio.save(output_filename, audio_tensor, sample_rate=24000, backend="soundfile")
+    print(f"Hoàn thành! File âm thanh đã được lưu tại: {output_filename}")
+except Exception as e:
+    print(f"[ERROR] Không thể lưu file audio '{output_filename}': {e}")
+    raise
