@@ -220,7 +220,7 @@ def mic_worker(audio_queue, mic, rnn_lib, rnn_state, silero_vad,
             audio = capture_audio(mic, rnn_lib, rnn_state, silero_vad, audio_queue, voice_timer, mic_recording)
 
             if isinstance(audio, str) and audio == "__NO_VOICE__":
-                time.sleep(0.5)
+                time.sleep(0.3)
                 continue
 
             if audio is None:
@@ -320,9 +320,13 @@ def login_and_get_token():
 #         print(f"{RED}[TTS] Loi phat audio: {e}{RESET}")
 #     finally:
 #         is_playing_event.clear()
-def play_audio_stream(url, is_playing_event):
+def play_audio_stream(url, is_playing_event, mic=None):
     try:
         is_playing_event.set()
+        # Mute mic ngay lập tức để không thu âm lại lúc phát
+        if mic:
+            mic.is_muted.set()
+            mic.clear()  # Xóa sạch audio cũ trong queue
         print(f"{CYAN}[TTS] Dang phat audio...{RESET}")
         
         stream = _pyaudio.open(
@@ -336,7 +340,6 @@ def play_audio_stream(url, is_playing_event):
             if r.status_code != 200:
                 print(f"{RED}[TTS] Loi tai audio: {r.status_code}{RESET}")
                 stream.close()
-                is_playing_event.clear()
                 return
 
             first_chunk = True
@@ -355,21 +358,26 @@ def play_audio_stream(url, is_playing_event):
         stream.stop_stream()
         stream.close()
         print(f"{GREEN}[TTS] Phat xong!{RESET}")
-        time.sleep(0.3)  # small delay before resuming mic
+        time.sleep(0.5)  # Đợi một chút để loa tắt hẳn trước khi mở mic
         
     except Exception as e:
         print(f"{RED}[TTS] Loi phat audio: {e}{RESET}")
     finally:
+        # Unmute mic và flush echo còn sót
+        if mic:
+            mic.clear()  # Xóa echo còn sót trong queue
+            mic.is_muted.clear()
         is_playing_event.clear()
 
 
 class WebSocketHandler:
-    def __init__(self, token, is_playing_event):
+    def __init__(self, token, is_playing_event, mic=None):
         self.token = token
         self.ws_url = f"{WS_URL}?token={token}"
         self.ws = None
         self.connected = False
         self.is_playing_event = is_playing_event
+        self.mic = mic  # Tham chiếu đến MicStream để mute/unmute
         
     def on_message(self, ws, message):
         try:
@@ -387,7 +395,7 @@ class WebSocketHandler:
                     print(f"{CYAN}[Audio URL]: {audio_url}{RESET}")
                     threading.Thread(
                         target=play_audio_stream,
-                        args=(audio_url, self.is_playing_event),
+                        args=(audio_url, self.is_playing_event, self.mic),
                         daemon=True
                     ).start()
             
@@ -484,7 +492,15 @@ def main():
     
     is_playing_event = threading.Event()
     
-    ws_handler = WebSocketHandler(token, is_playing_event)
+    rnn_lib, rnn_state = init_rnnoise()
+    silero_model = init_silero()
+    silero_vad = SileroVAD(silero_model)
+
+    mic = MicStream()
+    mic.start()
+    print("[Mic] Microphone stream da mo.")
+
+    ws_handler = WebSocketHandler(token, is_playing_event, mic=mic)
     ws = ws_handler.connect()
     ws_thread = threading.Thread(
         target=ws.run_forever,
@@ -493,14 +509,6 @@ def main():
     )
     ws_thread.start()
     time.sleep(1)
-
-    rnn_lib, rnn_state = init_rnnoise()
-    silero_model = init_silero()
-    silero_vad = SileroVAD(silero_model)
-
-    mic = MicStream()
-    mic.start()
-    print("[Mic] Microphone stream da mo.")
 
     print("\n[STT] Google Speech Recognition")
     print("[STT] San sang!\n")

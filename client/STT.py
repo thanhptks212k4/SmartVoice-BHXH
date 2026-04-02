@@ -1,4 +1,5 @@
 import numpy as np
+import threading
 import sounddevice as sd
 import time
 import ctypes
@@ -135,8 +136,12 @@ class MicStream:
     def __init__(self):
         self.q = queue.Queue(maxsize=MIC_QUEUE_MAX)
         self.stream = None
+        self.is_muted = threading.Event()  # khi set → mic bị tắt (đang phát audio)
 
     def _callback(self, indata, frames, t_info, status):
+        # Khi đang phát audio → drop toàn bộ frame, không đưa vào queue
+        if self.is_muted.is_set():
+            return
         try:
             self.q.put_nowait(indata[:, 0].copy())
         except queue.Full:
@@ -189,6 +194,12 @@ def capture_audio(mic, rnn_lib, rnn_state, silero_vad, audio_queue=None, voice_t
     print("\r[MIC] Dang lang nghe...          ", end="", flush=True)
 
     while True:
+        # Nếu mic đang bị mute (đang phát audio) → thoát capture ngay
+        if mic.is_muted.is_set():
+            if recording_flag:
+                recording_flag.clear()
+            return "__NO_VOICE__"
+
         try:
             block_48k = mic.get(timeout=0.5)
         except queue.Empty:
