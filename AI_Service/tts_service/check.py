@@ -84,7 +84,7 @@ def tts(model: Xtts, text: str, language: str, gpt_cond_latent: torch.Tensor, sp
             language=language,
             gpt_cond_latent=gpt_cond_latent,
             speaker_embedding=speaker_embedding,
-length_penalty=1.0,
+            length_penalty=1.0,
             repetition_penalty=10.0,
             top_k=10,
             top_p=0.5,

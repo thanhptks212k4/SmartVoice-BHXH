@@ -11,7 +11,7 @@ import speech_recognition as sr
 import requests
 import websocket
 import pyaudio
-voice="nutreem"
+voice="nuhanoi"
 
 from STT import (
     init_rnnoise, init_silero, SileroVAD,
@@ -289,7 +289,37 @@ def login_and_get_token():
         print(f"{RED}[Auth] Loi: {e}{RESET}")
         return None
 
+# import soundfile as sf
 
+# def play_audio_stream(url, is_playing_event):
+#     try:
+#         is_playing_event.set()
+#         print(f"{CYAN}[TTS] Dang phat audio...{RESET}")
+
+#         res = requests.get(url)
+#         if res.status_code != 200:
+#             print(f"{RED}[TTS] Loi tai audio{RESET}")
+#             return
+
+#         data, samplerate = sf.read(io.BytesIO(res.content), dtype='int16')
+
+#         stream = _pyaudio.open(
+#             format=pyaudio.paInt16,
+#             channels=data.shape[1] if len(data.shape) > 1 else 1,
+#             rate=samplerate,
+#             output=True
+#         )
+
+#         stream.write(data.tobytes())
+
+#         stream.stop_stream()
+#         stream.close()
+#         print(f"{GREEN}[TTS] Phat xong!{RESET}")
+
+#     except Exception as e:
+#         print(f"{RED}[TTS] Loi phat audio: {e}{RESET}")
+#     finally:
+#         is_playing_event.clear()
 def play_audio_stream(url, is_playing_event):
     try:
         is_playing_event.set()
@@ -315,7 +345,7 @@ def play_audio_stream(url, is_playing_event):
                     continue
 
                 if first_chunk:
-                    chunk = chunk[44:]
+                    # chunk = chunk[44:]
                     first_chunk = False
                     if not chunk:
                         continue

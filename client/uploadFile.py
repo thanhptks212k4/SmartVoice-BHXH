@@ -4,9 +4,9 @@ import requests
 
 # --- CẤU HÌNH ---
 API_URL = 'http://localhost:3000/api/admin/rag/uploadfile'
-TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImM3N2IzOGE4LWVjNjItNGRlZS04ZTU2LWM5MzQwZmZkNTNkOCIsInVzZXJuYW1lIjoiYWRtaW4iLCJpYXQiOjE3NzM4OTU3NTMsImV4cCI6MTc3NjQ4Nzc1M30.tXK93_v_wwaAG_4B352lxeNKlOr0eZLnqk21dNJRHXs'  # Dán token của bạn vào đây
-TARGET_DIR = r'\\wsl.localhost\Ubuntu-22.04\home\thanhserveice\chatbot\data_cminh'  # Thư mục chứa 1000 file (có folder con)
-GROUP_ID = '0f360bd8-c669-4bbc-a1d6-1602aca46fbc' # Thêm GroupID của bạn vào đây
+TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVjMDI3ZTc1LTUyYTctNDAyNC05ZmQ0LTcxNDFmNWI1MDA1MyIsInVzZXJuYW1lIjoiYWRtaW4iLCJpYXQiOjE3NzQwMDc5ODcsImV4cCI6MTc3NjU5OTk4N30.cIjiFTeYpZIxm6oDfZqYfrF_jiaFCTThiqqpRxaiyNQ'  # Dán token của bạn vào đây
+TARGET_DIR = r'\\wsl.localhost\Ubuntu-22.04\home\thanhserveice\data_BHXH'  # Thư mục chứa 1000 file (có folder con)
+GROUP_ID = '028686bd-00d7-4def-a900-5f1aa97e2849' # Thêm GroupID của bạn vào đây
 BATCH_SIZE = 20  # Số file gửi mỗi lần
 
 def fix_long_path(path):

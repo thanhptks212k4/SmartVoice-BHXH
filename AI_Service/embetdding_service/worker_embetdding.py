@@ -37,6 +37,5 @@ def main():
                 print(f"Lỗi khi xử lý task",e)
        
 
-
 if __name__ == "__main__":
     main()

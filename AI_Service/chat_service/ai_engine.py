@@ -1,5 +1,5 @@
 from google import genai
-import sys, os
+import sys, os, re  # UPDATED - thêm re
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 from sentence_transformers import SentenceTransformer
@@ -14,15 +14,8 @@ class AIEngine:
         self.client = genai.Client(api_key=settings.API_LLM)
         self.qdrant_client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
         self.embed_model = SentenceTransformer(settings.MODEL_QDRANT)
-        self.collection_name = "bytehome"
+        self.collection_name = "thanhpt"
         self.chat_sessions = {}
-# Bạn là một bé gái lớp 4. 
-#             Bây giờ là 17h45 6/3/2025
-#             QUY TẮC BẮT BUỘC: 
-#             1. KHÔNG dùng ký tự số (0-9) hoặc ký hiệu (%). Phải viết bằng chữ (VD: "tám phần trăm").
-#             2. KHÔNG mở ngoặc đơn để chú thích. 
-#             3. Trả lời ngắn gọn 3 câu cho câu dễ, 5-10 câu cho câu khó.
-#             4. Không ghi nguồn tài liệu. 
     def get_chat_session(self, uuid ,group_id):
         if uuid not in self.chat_sessions:
             # Khởi tạo session với System Instruction để AI luôn đóng vai bé gái lớp 4
@@ -30,7 +23,9 @@ class AIEngine:
             print("check5")
             content = redis_manager.get_cache(f"group:{group_id}:content")
             print("prompt laf",content)
-            system_instruction = content
+            # UPDATED - Thêm rule trả lời ngắn gọn vào system_instruction
+            concise_rule = "\nQUY TẮC TRẢ LỜI: Trả lời ngắn gọn trong 3–5 câu nhưng phải đầy đủ ý, rõ ràng, không lan man. Ưu tiên: 1 câu trả lời chính, 1-2 câu giải thích, 1 câu kết luận hoặc gợi ý."
+            system_instruction = content + concise_rule
             self.chat_sessions[uuid] = self.client.chats.create(
                 model=settings.MODEL_NAME,
                 config={"system_instruction": system_instruction}
@@ -62,12 +57,30 @@ class AIEngine:
             print(f"[Qdrant Error] {e}")
             return ""
 
+    # UPDATED - Thêm câu giới thiệu đầu cuộc hội thoại
+    INTRO_MESSAGE = "Tôi là một trợ lý ảo tư vấn bảo hiểm xã hội, tôi có thể giúp gì cho bạn?\n\n"
+
+    # UPDATED - Hàm cắt response còn tối đa 5 câu
+    def _truncate_response(self, text):
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        sentences = [s.strip() for s in sentences if s.strip()]
+        if len(sentences) > 5:
+            sentences = sentences[:5]
+            # Đảm bảo câu cuối kết thúc bằng dấu câu
+            if not sentences[-1][-1] in '.!?':
+                sentences[-1] += '.'
+        return ' '.join(sentences)
+
     def generate_respone(self, prompt: str, uuid: str ,group_id: str):
         try:
             print("check3")
             context = self.get_context(uuid, prompt ,group_id)
             chat = self.get_chat_session(uuid,group_id)
-           
+
+            # UPDATED - Kiểm tra lịch sử để xác định tin nhắn đầu tiên
+            history = chat.get_history()
+            is_first_message = len(history) == 0
+
             full_prompt = f"THÔNG TIN HỖ TRỢ:\n{context}\n\nCÂU HỎI: {prompt}"
             print(full_prompt)
             response = chat.send_message(full_prompt)
@@ -76,7 +89,14 @@ class AIEngine:
                 print(f"role: {msg.role}")
                 print(f"text: {msg.parts[0].text}")
                 print("---")
-            return response.text
+
+            # UPDATED - Cắt response ngắn gọn 3-5 câu
+            final_text = self._truncate_response(response.text)
+
+            # UPDATED - Thêm intro nếu là tin nhắn đầu tiên
+            if is_first_message:
+                return self.INTRO_MESSAGE + final_text
+            return final_text
             
         except Exception as e:
             print(f"[genAI ERROR] {e}")

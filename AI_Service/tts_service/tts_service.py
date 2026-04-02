@@ -6,7 +6,7 @@ from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
 import numpy as np
 import soundfile as sf
-output_dir = "/content/drive/MyDrive/git/debug_audio"
+output_dir = "debug_audio"
 
 # 2. Tạo thư mục nếu chưa có
 if not os.path.exists(output_dir):
