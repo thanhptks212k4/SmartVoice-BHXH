@@ -121,9 +121,15 @@ class ResBlock1(torch.nn.Module):
 
     def remove_weight_norm(self):
         for l in self.convs1:
-            remove_parametrizations(l, "weight")
+            try:
+                remove_parametrizations(l, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(l)
         for l in self.convs2:
-            remove_parametrizations(l, "weight")
+            try:
+                remove_parametrizations(l, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(l)
 
 
 class ResBlock2(torch.nn.Module):
@@ -177,7 +183,10 @@ class ResBlock2(torch.nn.Module):
 
     def remove_weight_norm(self):
         for l in self.convs:
-            remove_parametrizations(l, "weight")
+            try:
+                remove_parametrizations(l, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(l)
 
 
 class HifiganGenerator(torch.nn.Module):
@@ -252,10 +261,16 @@ class HifiganGenerator(torch.nn.Module):
             self.cond_layer = nn.Conv1d(cond_channels, upsample_initial_channel, 1)
 
         if not conv_pre_weight_norm:
-            remove_parametrizations(self.conv_pre, "weight")
+            try:
+                remove_parametrizations(self.conv_pre, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(self.conv_pre)
 
         if not conv_post_weight_norm:
-            remove_parametrizations(self.conv_post, "weight")
+            try:
+                remove_parametrizations(self.conv_post, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(self.conv_post)
 
         if self.cond_in_each_up_layer:
             self.conds = nn.ModuleList()
@@ -318,11 +333,20 @@ class HifiganGenerator(torch.nn.Module):
     def remove_weight_norm(self):
         print("Removing weight norm...")
         for l in self.ups:
-            remove_parametrizations(l, "weight")
+            try:
+                remove_parametrizations(l, "weight")
+            except (ValueError, Exception):
+                torch.nn.utils.remove_weight_norm(l)
         for l in self.resblocks:
             l.remove_weight_norm()
-        remove_parametrizations(self.conv_pre, "weight")
-        remove_parametrizations(self.conv_post, "weight")
+        try:
+            remove_parametrizations(self.conv_pre, "weight")
+        except (ValueError, Exception):
+            torch.nn.utils.remove_weight_norm(self.conv_pre)
+        try:
+            remove_parametrizations(self.conv_post, "weight")
+        except (ValueError, Exception):
+            torch.nn.utils.remove_weight_norm(self.conv_post)
 
     def load_checkpoint(
         self, config, checkpoint_path, eval=False, cache=False

@@ -779,13 +779,14 @@ class Xtts(BaseTTS):
 
         checkpoint = self.get_compatible_checkpoint_state_dict(model_path)
 
+
         # deal with v1 and v1.1. V1 has the init_gpt_for_inference keys, v1.1 do not
         try:
             self.load_state_dict(checkpoint, strict=strict)
-        except:
+        except RuntimeError:
             if eval:
                 self.gpt.init_gpt_for_inference(kv_cache=self.args.kv_cache)
-            self.load_state_dict(checkpoint, strict=strict)
+            self.load_state_dict(checkpoint, strict=False)
 
         if eval:
             self.hifigan_decoder.eval()
