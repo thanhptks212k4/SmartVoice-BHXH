@@ -1,35 +1,25 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
+import MascotCard from "./pages/MascotCard";
 
-function App() {
-  const [count, setCount] = useState(0)
+const socket = io("http://localhost:5500", { autoConnect: true });
+
+export default function App() {
+  const [voiceState, setVoiceState] = useState("idle");
+
+  useEffect(() => {
+    socket.on("state", (data) => setVoiceState(data.s));
+    window.setVoiceState = setVoiceState;
+    return () => socket.off("state");
+  }, []);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div style={{ display:"flex", justifyContent:"center",
+                  alignItems:"center", minHeight:"100vh" }}>
+      <div style={{ background:"#1a1a2e", borderRadius:24,
+                    padding:"2rem", border:"1px solid #2a2a4a" }}>
+        <MascotCard state={voiceState} />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
-
-export default App

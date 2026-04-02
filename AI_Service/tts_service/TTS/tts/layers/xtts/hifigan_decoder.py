@@ -3,8 +3,7 @@ import torchaudio
 from torch import nn
 from torch.nn import Conv1d, ConvTranspose1d
 from torch.nn import functional as F
-from torch.nn.utils import weight_norm
-from torch.nn.utils.parametrize import remove_parametrizations
+from torch.nn.utils import weight_norm, remove_weight_norm
 
 from TTS.utils.io import load_fsspec
 
@@ -121,9 +120,9 @@ class ResBlock1(torch.nn.Module):
 
     def remove_weight_norm(self):
         for l in self.convs1:
-            remove_parametrizations(l, "weight")
+            remove_weight_norm(l, "weight")
         for l in self.convs2:
-            remove_parametrizations(l, "weight")
+            remove_weight_norm(l, "weight")
 
 
 class ResBlock2(torch.nn.Module):
@@ -177,7 +176,7 @@ class ResBlock2(torch.nn.Module):
 
     def remove_weight_norm(self):
         for l in self.convs:
-            remove_parametrizations(l, "weight")
+            remove_weight_norm(l, "weight")
 
 
 class HifiganGenerator(torch.nn.Module):
@@ -252,10 +251,10 @@ class HifiganGenerator(torch.nn.Module):
             self.cond_layer = nn.Conv1d(cond_channels, upsample_initial_channel, 1)
 
         if not conv_pre_weight_norm:
-            remove_parametrizations(self.conv_pre, "weight")
+            remove_weight_norm(self.conv_pre, "weight")
 
         if not conv_post_weight_norm:
-            remove_parametrizations(self.conv_post, "weight")
+            remove_weight_norm(self.conv_post, "weight")
 
         if self.cond_in_each_up_layer:
             self.conds = nn.ModuleList()
@@ -318,11 +317,11 @@ class HifiganGenerator(torch.nn.Module):
     def remove_weight_norm(self):
         print("Removing weight norm...")
         for l in self.ups:
-            remove_parametrizations(l, "weight")
+            remove_weight_norm(l, "weight")
         for l in self.resblocks:
             l.remove_weight_norm()
-        remove_parametrizations(self.conv_pre, "weight")
-        remove_parametrizations(self.conv_post, "weight")
+        remove_weight_norm(self.conv_pre, "weight")
+        remove_weight_norm(self.conv_post, "weight")
 
     def load_checkpoint(
         self, config, checkpoint_path, eval=False, cache=False

@@ -11,6 +11,8 @@ import speech_recognition as sr
 import requests
 import websocket
 import pyaudio
+import socketio as sio_client
+import webbrowser
 voice="nuhanoi"
 
 from STT import (
@@ -39,6 +41,32 @@ RESET = "\033[0m"
 
 _recognizer = sr.Recognizer()
 _pyaudio = pyaudio.PyAudio()
+
+
+class UIConnector:
+    def __init__(self):
+        self._sio = sio_client.Client(logger=False, engineio_logger=False)
+        self._connected = False
+
+    def connect(self, url="http://localhost:5500"):
+        def _try():
+            try:
+                self._sio.connect(url)
+                self._connected = True
+                print(f"{GREEN}[UI] Ket noi giao dien thanh cong{RESET}")
+                webbrowser.open("http://localhost:5173")
+            except Exception as e:
+                print(f"{YELLOW}[UI] Khong ket noi duoc UI: {e}{RESET}")
+        threading.Thread(target=_try, daemon=True).start()
+
+    def notify(self, state: str):
+        if self._connected:
+            try:
+                self._sio.emit("set_state", {"s": state})
+            except Exception:
+                pass
+
+_ui = UIConnector()
 
 
 def transcribe_audio(audio_16k):
@@ -227,6 +255,7 @@ def mic_worker(audio_queue, mic, rnn_lib, rnn_state, silero_vad,
                 continue
 
             voice_timer.touch()
+            _ui.notify("listening")
 
             try:
                 audio_queue.put_nowait(audio)
@@ -265,6 +294,7 @@ def stt_worker(audio_queue, text_queue, stop_event, stt_busy):
             if not stop_event.is_set():
                 print(f"\n[STT] Loi: {e}")
         finally:
+            _ui.notify("idle")
             stt_busy.clear()
 
 
@@ -323,6 +353,7 @@ def login_and_get_token():
 def play_audio_stream(url, is_playing_event, mic=None):
     try:
         is_playing_event.set()
+        _ui.notify("speaking")
         # Mute mic ngay lập tức để không thu âm lại lúc phát
         if mic:
             mic.is_muted.set()
@@ -367,6 +398,7 @@ def play_audio_stream(url, is_playing_event, mic=None):
         if mic:
             mic.clear()  # Xóa echo còn sót trong queue
             mic.is_muted.clear()
+        _ui.notify("idle")
         is_playing_event.clear()
 
 
@@ -489,6 +521,8 @@ def main():
     if not token:
         print(f"\n{RED}[Error] Khong the lay token. Thoat.{RESET}\n")
         return
+
+    _ui.connect()
     
     is_playing_event = threading.Event()
     
