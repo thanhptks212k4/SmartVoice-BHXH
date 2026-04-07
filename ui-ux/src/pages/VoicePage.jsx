@@ -2,45 +2,43 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import MascotCard from "./MascotCard";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const WS_URL   = import.meta.env.VITE_WS_URL  || "ws://localhost:3000";
-const VOICE    = "nuhanoi";
+const BASE_URL   = import.meta.env.VITE_API_URL  || "http://localhost:3000";
+const WS_URL     = import.meta.env.VITE_WS_URL   || "ws://localhost:3000";
+const STT_WS_URL = import.meta.env.VITE_STT_WS_URL || "ws://localhost:8003";
+const VOICE      = "nuhanoi";
 
-// VAD config
-const SILENCE_THRESHOLD = 0.01;  // RMS dưới mức này = im lặng
-const SILENCE_DURATION  = 1800;  // ms im lặng để gửi
-const MIN_SPEECH_MS     = 400;   // bỏ qua chunk quá ngắn
+// Browser gửi chunk 20ms @ 16kHz = 320 samples
+const CHUNK_SAMPLES = 320;
 
 export default function VoicePage() {
-  const navigate  = useNavigate();
-  const [state, setState]     = useState("idle");    // idle | listening | speaking
-  const [botText, setBotText] = useState("");
-  const [error, setError]     = useState("");
+  const navigate = useNavigate();
+  const [state, setState]       = useState("idle");
+  const [botText, setBotText]   = useState("");
+  const [error, setError]       = useState("");
+  const [engine, setEngine]     = useState(
+    localStorage.getItem("stt_engine") || "google"
+  );
 
-  const wsRef          = useRef(null);
-  const audioCtxRef    = useRef(null);
-  const processorRef   = useRef(null);
-  const streamRef      = useRef(null);
-  const pcmBufferRef   = useRef([]);
-  const silenceTimerRef = useRef(null);
-  const speechStartRef  = useRef(null);
-  const isPlayingRef    = useRef(false);
-  const stateRef        = useRef("idle");
+  const wsRef      = useRef(null);   // Node WS
+  const sttWsRef   = useRef(null);   // STT WS
+  const audioCtxRef = useRef(null);
+  const processorRef = useRef(null);
+  const streamRef  = useRef(null);
+  const isPlayingRef = useRef(false);
+  const stateRef   = useRef("idle");
 
   const setStateBoth = (s) => { stateRef.current = s; setState(s); };
 
-  // ── WebSocket ──
+  // ── Kết nối Node WebSocket ──
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { navigate("/"); return; }
 
     const ws = new WebSocket(`${WS_URL}?token=${token}`);
     wsRef.current = ws;
-
     ws.onopen  = () => console.log("[WS] connected");
-    ws.onclose = () => console.log("[WS] closed");
-    ws.onerror = () => setError("Mất kết nối server");
-
+    ws.onclose = () => setError("Mất kết nối server");
+    ws.onerror = () => setError("Lỗi kết nối server");
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === "AI_VOICE_REPLY") {
@@ -48,21 +46,54 @@ export default function VoicePage() {
         if (data.audioUrl) playAudio(data.audioUrl);
       }
     };
-
     return () => ws.close();
   }, [navigate]);
 
-  // ── Play TTS audio ──
+  // ── Kết nối STT WebSocket ──
+  const connectSTT = useCallback(() => {
+    if (sttWsRef.current?.readyState === WebSocket.OPEN) return;
+    const ws = new WebSocket(STT_WS_URL);
+    ws.binaryType = "arraybuffer";
+    sttWsRef.current = ws;
+
+    ws.onopen = () => console.log("[STT-WS] connected");
+    ws.onclose = () => console.log("[STT-WS] closed");
+    ws.onerror = (e) => console.error("[STT-WS] error", e);
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.event === "speech_start") {
+        setStateBoth("listening");
+      } else if (data.event === "speech_end") {
+        setStateBoth("idle");
+      } else if (data.text) {
+        // Gửi text lên Node server qua WS
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            text: data.text,
+            language: "VI",
+            voice: VOICE,
+            timestamp: Math.floor(Date.now() / 1000),
+            duration: 0,
+          }));
+        }
+      }
+    };
+  }, []);
+
+  // ── Phát TTS audio ──
   const playAudio = useCallback(async (url) => {
     isPlayingRef.current = true;
     setStateBoth("speaking");
+    // Reset STT để tránh thu âm lại lúc phát
+    sttWsRef.current?.send(JSON.stringify({ cmd: "reset" }));
     try {
-      const res = await fetch(url);
-      const buf = await res.arrayBuffer();
-      const ctx = new AudioContext();
+      const res     = await fetch(url);
+      const buf     = await res.arrayBuffer();
+      const ctx     = new AudioContext();
       const decoded = await ctx.decodeAudioData(buf);
-      const src = ctx.createBufferSource();
-      src.buffer = decoded;
+      const src     = ctx.createBufferSource();
+      src.buffer    = decoded;
       src.connect(ctx.destination);
       src.start();
       src.onended = () => {
@@ -76,37 +107,27 @@ export default function VoicePage() {
     }
   }, []);
 
-  // ── Mic + VAD ──
+  // ── Mic capture → stream PCM lên STT WS ──
   const startMic = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const ctx = new AudioContext({ sampleRate: 16000 });
+      const ctx  = new AudioContext({ sampleRate: 16000 });
       audioCtxRef.current = ctx;
 
       const src  = ctx.createMediaStreamSource(stream);
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const proc = ctx.createScriptProcessor(CHUNK_SAMPLES, 1, 1);
       processorRef.current = proc;
 
       proc.onaudioprocess = (ev) => {
         if (isPlayingRef.current) return;
+        const stt = sttWsRef.current;
+        if (!stt || stt.readyState !== WebSocket.OPEN) return;
 
         const f32 = ev.inputBuffer.getChannelData(0);
-        const rms = Math.sqrt(f32.reduce((s, v) => s + v * v, 0) / f32.length);
-
-        if (rms > SILENCE_THRESHOLD) {
-          // có tiếng nói
-          if (!speechStartRef.current) speechStartRef.current = Date.now();
-          setStateBoth("listening");
-          pcmBufferRef.current.push(new Float32Array(f32));
-
-          // reset silence timer
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = setTimeout(() => {
-            flushBuffer();
-          }, SILENCE_DURATION);
-        }
+        // Gửi Float32Array binary
+        stt.send(f32.buffer.slice(f32.byteOffset, f32.byteOffset + f32.byteLength));
       };
 
       src.connect(proc);
@@ -116,57 +137,25 @@ export default function VoicePage() {
     }
   }, []);
 
-  // ── Gửi audio lên Whisper API (hoặc Google STT nếu chưa có) ──
-  const flushBuffer = useCallback(async () => {
-    const chunks = pcmBufferRef.current.splice(0);
-    if (!chunks.length) return;
-
-    const duration = Date.now() - (speechStartRef.current || Date.now());
-    speechStartRef.current = null;
-    if (duration < MIN_SPEECH_MS) return;
-
-    setStateBoth("idle");
-
-    // Ghép PCM -> WAV
-    const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-    const pcm = new Float32Array(totalLen);
-    let offset = 0;
-    for (const c of chunks) { pcm.set(c, offset); offset += c.length; }
-
-    const wav = encodeWav(pcm, 16000);
-    const blob = new Blob([wav], { type: "audio/wav" });
-
-    // Gửi lên STT endpoint
-    const sttUrl = import.meta.env.VITE_STT_URL || `${BASE_URL}/stt`;
-    try {
-      const form = new FormData();
-      form.append("audio", blob, "audio.wav");
-      const res  = await fetch(sttUrl, { method: "POST", body: form });
-      const data = await res.json();
-      const text = data.text?.trim();
-      if (text && wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          text,
-          language: "VI",
-          voice: VOICE,
-          timestamp: Math.floor(Date.now() / 1000),
-          duration: Math.round(duration / 1000),
-        }));
-      }
-    } catch (e) {
-      console.error("[STT]", e);
-    }
-  }, []);
-
   useEffect(() => {
+    connectSTT();
     startMic();
     return () => {
       processorRef.current?.disconnect();
       audioCtxRef.current?.close();
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      clearTimeout(silenceTimerRef.current);
+      sttWsRef.current?.close();
     };
-  }, [startMic]);
+  }, [connectSTT, startMic]);
+
+  // ── Đổi engine STT ──
+  const handleEngineChange = (e) => {
+    const val = e.target.value;
+    setEngine(val);
+    localStorage.setItem("stt_engine", val);
+    // Gửi lệnh đổi engine lên server (cần restart server để có hiệu lực)
+    alert(`Đổi sang ${val.toUpperCase()}. Restart STT server với STT_ENGINE=${val}`);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -175,9 +164,19 @@ export default function VoicePage() {
 
   return (
     <div style={S.bg}>
-      <button style={S.logout} onClick={handleLogout}>Đăng xuất</button>
+      {/* Header */}
+      <div style={S.header}>
+        <select style={S.select} value={engine} onChange={handleEngineChange}>
+          <option value="google">Google STT</option>
+          <option value="whisper">Whisper</option>
+        </select>
+        <button style={S.logout} onClick={handleLogout}>Đăng xuất</button>
+      </div>
+
       {error && <p style={S.error}>{error}</p>}
+
       <MascotCard state={state} />
+
       {botText && (
         <div style={S.bubble}>
           <p style={S.bubbleText}>{botText}</p>
@@ -187,36 +186,22 @@ export default function VoicePage() {
   );
 }
 
-// ── Encode Float32 PCM -> WAV bytes ──
-function encodeWav(samples, sampleRate) {
-  const buf    = new ArrayBuffer(44 + samples.length * 2);
-  const view   = new DataView(buf);
-  const write  = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
-  const i16len = samples.length * 2;
-
-  write(0, "RIFF"); view.setUint32(4, 36 + i16len, true);
-  write(8, "WAVE"); write(12, "fmt ");
-  view.setUint32(16, 16, true);  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);  write(36, "data");
-  view.setUint32(40, i16len, true);
-
-  let off = 44;
-  for (let i = 0; i < samples.length; i++, off += 2) {
-    view.setInt16(off, Math.max(-32768, Math.min(32767, samples[i] * 32768)), true);
-  }
-  return buf;
-}
-
 const S = {
   bg: {
     minHeight: "100vh", display: "flex", flexDirection: "column",
     justifyContent: "center", alignItems: "center",
     background: "#0f0f1a", position: "relative",
   },
-  logout: {
+  header: {
     position: "absolute", top: 20, right: 20,
+    display: "flex", gap: 10, alignItems: "center",
+  },
+  select: {
+    background: "#1a1a2e", border: "1px solid #3a3a5a",
+    color: "#aaa", borderRadius: 8, padding: "6px 10px",
+    fontSize: 13, cursor: "pointer", outline: "none",
+  },
+  logout: {
     background: "transparent", border: "1px solid #3a3a5a",
     color: "#888", borderRadius: 8, padding: "6px 14px",
     cursor: "pointer", fontSize: 13,
