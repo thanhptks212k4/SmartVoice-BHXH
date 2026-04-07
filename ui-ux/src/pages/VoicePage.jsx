@@ -27,6 +27,8 @@ export default function VoicePage() {
   const isPlayingRef = useRef(false);
   const stateRef   = useRef("idle");
 
+  const [micReady, setMicReady] = useState(false);
+
   const setStateBoth = (s) => { stateRef.current = s; setState(s); };
 
   // ── Kết nối Node WebSocket ──
@@ -110,8 +112,16 @@ export default function VoicePage() {
   // ── Mic capture → stream PCM lên STT WS ──
   const startMic = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError("Trình duyệt không hỗ trợ microphone. Dùng Chrome/Edge trên localhost.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: false, sampleRate: 16000 }
+      });
       streamRef.current = stream;
+      setMicReady(true);
+      setError("");
 
       const ctx  = new AudioContext({ sampleRate: 16000 });
       audioCtxRef.current = ctx;
@@ -139,7 +149,7 @@ export default function VoicePage() {
 
   useEffect(() => {
     connectSTT();
-    startMic();
+    // Không tự động startMic — cần user gesture để Chrome cho phép
     return () => {
       processorRef.current?.disconnect();
       audioCtxRef.current?.close();
@@ -174,6 +184,12 @@ export default function VoicePage() {
       </div>
 
       {error && <p style={S.error}>{error}</p>}
+
+      {!micReady && (
+        <button style={S.micBtn} onClick={startMic}>
+          🎤 Bật microphone
+        </button>
+      )}
 
       <MascotCard state={state} />
 
@@ -212,4 +228,9 @@ const S = {
     borderRadius: 14, padding: "12px 20px", maxWidth: 360,
   },
   bubbleText: { color: "#ddd", margin: 0, fontSize: 14, lineHeight: 1.6 },
+  micBtn: {
+    marginBottom: 16, padding: "12px 28px", borderRadius: 12,
+    background: "#7c4dff", color: "#fff", border: "none",
+    fontSize: 15, fontWeight: 600, cursor: "pointer",
+  },
 };
