@@ -53,34 +53,35 @@ export default function VoicePage() {
 
   // ── Kết nối STT WebSocket ──
   const connectSTT = useCallback(() => {
-    if (sttWsRef.current?.readyState === WebSocket.OPEN) return;
-    const ws = new WebSocket(STT_WS_URL);
-    ws.binaryType = "arraybuffer";
-    sttWsRef.current = ws;
+    return new Promise((resolve) => {
+      if (sttWsRef.current?.readyState === WebSocket.OPEN) { resolve(); return; }
+      const ws = new WebSocket(STT_WS_URL);
+      ws.binaryType = "arraybuffer";
+      sttWsRef.current = ws;
 
-    ws.onopen = () => console.log("[STT-WS] connected");
-    ws.onclose = () => console.log("[STT-WS] closed");
-    ws.onerror = (e) => console.error("[STT-WS] error", e);
+      ws.onopen = () => { console.log("[STT-WS] connected"); resolve(); };
+      ws.onclose = () => console.log("[STT-WS] closed");
+      ws.onerror = (e) => { console.error("[STT-WS] error", e); resolve(); };
 
-    ws.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.event === "speech_start") {
-        setStateBoth("listening");
-      } else if (data.event === "speech_end") {
-        setStateBoth("idle");
-      } else if (data.text) {
-        // Gửi text lên Node server qua WS
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            text: data.text,
-            language: "VI",
-            voice: VOICE,
-            timestamp: Math.floor(Date.now() / 1000),
-            duration: 0,
-          }));
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.event === "speech_start") {
+          setStateBoth("listening");
+        } else if (data.event === "speech_end") {
+          setStateBoth("idle");
+        } else if (data.text) {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              text: data.text,
+              language: "VI",
+              voice: VOICE,
+              timestamp: Math.floor(Date.now() / 1000),
+              duration: 0,
+            }));
+          }
         }
-      }
-    };
+      };
+    });
   }, []);
 
   // ── Phát TTS audio ──
@@ -142,14 +143,24 @@ export default function VoicePage() {
 
       src.connect(proc);
       proc.connect(ctx.destination);
-    } catch {
-      setError("Không thể truy cập microphone");
+    } catch (err) {
+      console.error("[Mic] Error:", err.name, err.message);
+      if (err.name === "NotAllowedError") {
+        setError("Mic bị từ chối — click icon mic trên address bar để cho phép");
+      } else if (err.name === "NotFoundError") {
+        setError("Không tìm thấy microphone");
+      } else {
+        setError(`Lỗi mic: ${err.message}`);
+      }
     }
   }, []);
 
   useEffect(() => {
-    connectSTT();
-    // Không tự động startMic — cần user gesture để Chrome cho phép
+    const init = async () => {
+      await connectSTT();
+      await startMic();
+    };
+    init();
     return () => {
       processorRef.current?.disconnect();
       audioCtxRef.current?.close();
@@ -157,7 +168,6 @@ export default function VoicePage() {
       sttWsRef.current?.close();
     };
   }, [connectSTT, startMic]);
-
   // ── Đổi engine STT ──
   const handleEngineChange = (e) => {
     const val = e.target.value;
@@ -184,12 +194,6 @@ export default function VoicePage() {
       </div>
 
       {error && <p style={S.error}>{error}</p>}
-
-      {!micReady && (
-        <button style={S.micBtn} onClick={startMic}>
-          🎤 Bật microphone
-        </button>
-      )}
 
       <MascotCard state={state} />
 
