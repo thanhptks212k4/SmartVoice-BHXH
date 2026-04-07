@@ -29,9 +29,10 @@ NOISE_ALPHA   = 0.95
 MIN_ENERGY    = 0.003
 DOM_WINDOW    = 10
 DOM_THRESHOLD = 0.3
-SILENCE_S     = 0.8
+SILENCE_S     = 1.2
 MAX_RECORD_S  = 15.0
 NO_VOICE_S    = 10.0
+MIN_ENERGY    = 0.008
 
 _HP_B, _HP_A = butter(2, 80 / (TARGET_SR / 2), btype='high')
 
@@ -85,8 +86,15 @@ class SileroVAD:
 def run_stt(audio_np):
     """audio_np: float32 numpy array 16kHz mono"""
     if STT_ENGINE == "whisper":
-        result = whisper_model.transcribe(audio_np, language="vi", fp16=False)
-        return result["text"].strip()
+        result = whisper_model.transcribe(audio_np, language="vi", fp16=False,
+                                          condition_on_previous_text=False,
+                                          no_speech_threshold=0.6,
+                                          logprob_threshold=-1.0)
+        text = result["text"].strip()
+        # Bỏ qua hallucination: chứa token đặc biệt hoặc quá ngắn
+        if "<|" in text or len(text) < 2:
+            return ""
+        return text
     else:
         import io, wave, speech_recognition as sr
         pcm16 = (audio_np * 32768).astype(np.int16).tobytes()
@@ -215,7 +223,7 @@ async def handle(websocket):
 async def main():
     print(f"[STT-WS] Engine: {STT_ENGINE.upper()}")
     print(f"[STT-WS] Listening on ws://0.0.0.0:{PORT}")
-    async with websockets.serve(handle, "0.0.0.0", PORT):
+    async with websockets.serve(handle, "0.0.0.0", PORT, ping_interval=60, ping_timeout=120):
         await asyncio.Future()
 
 

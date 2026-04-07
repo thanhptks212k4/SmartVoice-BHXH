@@ -8,7 +8,7 @@ const STT_WS_URL = import.meta.env.VITE_STT_WS_URL || "ws://localhost:8003";
 const VOICE      = "nuhanoi";
 
 // Browser gửi chunk 20ms @ 16kHz = 320 samples
-const CHUNK_SAMPLES = 320;
+const CHUNK_SAMPLES = 512;
 
 export default function VoicePage() {
   const navigate = useNavigate();
