@@ -74,13 +74,23 @@ class AIEngine:
     def generate_respone(self, prompt: str, uuid: str ,group_id: str):
         try:
             print("check3")
-            context = self.get_context(uuid, prompt ,group_id)
             chat = self.get_chat_session(uuid,group_id)
 
-            # UPDATED - Kiểm tra lịch sử để xác định tin nhắn đầu tiên
+            # Kiểm tra lịch sử để xác định tin nhắn đầu tiên
             history = chat.get_history()
             is_first_message = len(history) == 0
 
+            # Nếu là tin nhắn đầu tiên, chỉ trả về câu giới thiệu (không gọi AI)
+            if is_first_message:
+                # Gửi prompt vào chat để lưu lịch sử context cho lần sau
+                context = self.get_context(uuid, prompt ,group_id)
+                full_prompt = f"THÔNG TIN HỖ TRỢ:\n{context}\n\nCÂU HỎI: {prompt}"
+                print(full_prompt)
+                response = chat.send_message(full_prompt)
+                # Bỏ qua response của AI, chỉ trả về intro
+                return self.INTRO_MESSAGE.strip()
+
+            context = self.get_context(uuid, prompt ,group_id)
             full_prompt = f"THÔNG TIN HỖ TRỢ:\n{context}\n\nCÂU HỎI: {prompt}"
             print(full_prompt)
             response = chat.send_message(full_prompt)
@@ -90,12 +100,8 @@ class AIEngine:
                 print(f"text: {msg.parts[0].text}")
                 print("---")
 
-            # UPDATED - Cắt response ngắn gọn 3-5 câu
+            # Cắt response ngắn gọn 3-5 câu
             final_text = self._truncate_response(response.text)
-
-            # UPDATED - Thêm intro nếu là tin nhắn đầu tiên
-            if is_first_message:
-                return self.INTRO_MESSAGE + final_text
             return final_text
             
         except Exception as e:
