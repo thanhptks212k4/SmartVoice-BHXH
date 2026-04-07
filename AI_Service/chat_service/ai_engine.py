@@ -23,9 +23,10 @@ class AIEngine:
             print("check5")
             content = redis_manager.get_cache(f"group:{group_id}:content")
             print("prompt laf",content)
-            # UPDATED - Thêm rule trả lời ngắn gọn vào system_instruction
+            # Thêm rule nhận diện vai trò + trả lời ngắn gọn vào system_instruction
+            identity_rule = "\nNHẬN DIỆN VAI TRÒ: Bạn là một trợ lý ảo tư vấn bảo hiểm xã hội. Khi người dùng hỏi 'bạn là ai', 'bạn là gì', hoặc bất kỳ câu hỏi nào về danh tính của bạn, hãy luôn trả lời rằng bạn là trợ lý ảo tư vấn bảo hiểm xã hội. TUYỆT ĐỐI KHÔNG được nói bạn là mô hình ngôn ngữ, AI của Google, hay bất kỳ danh tính nào khác."
             concise_rule = "\nQUY TẮC TRẢ LỜI: Trả lời ngắn gọn trong 3–5 câu nhưng phải đầy đủ ý, rõ ràng, không lan man. Ưu tiên: 1 câu trả lời chính, 1-2 câu giải thích, 1 câu kết luận hoặc gợi ý."
-            system_instruction = content + concise_rule
+            system_instruction = content + identity_rule + concise_rule
             self.chat_sessions[uuid] = self.client.chats.create(
                 model=settings.MODEL_NAME,
                 config={"system_instruction": system_instruction}
@@ -82,12 +83,7 @@ class AIEngine:
 
             # Nếu là tin nhắn đầu tiên, chỉ trả về câu giới thiệu (không gọi AI)
             if is_first_message:
-                # Gửi prompt vào chat để lưu lịch sử context cho lần sau
-                context = self.get_context(uuid, prompt ,group_id)
-                full_prompt = f"THÔNG TIN HỖ TRỢ:\n{context}\n\nCÂU HỎI: {prompt}"
-                print(full_prompt)
-                response = chat.send_message(full_prompt)
-                # Bỏ qua response của AI, chỉ trả về intro
+                print("[INTRO] Tin nhan dau tien, tra ve intro message")
                 return self.INTRO_MESSAGE.strip()
 
             context = self.get_context(uuid, prompt ,group_id)
