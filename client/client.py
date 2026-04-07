@@ -414,6 +414,78 @@ def login_and_get_token():
 #         _ui.notify("idle")
 #         is_playing_event.clear()
 
+# def play_audio_stream(url, is_playing_event, mic=None):
+#     try:
+#         is_playing_event.set()
+#         _ui.notify("speaking")
+#         if mic:
+#             mic.is_muted.set()
+#             mic.clear()
+#         print(f"{CYAN}[TTS] Dang phat audio...{RESET}")
+
+#         with requests.get(url, timeout=15) as r:
+#             if r.status_code != 200:
+#                 print(f"{RED}[TTS] Loi tai audio: {r.status_code}{RESET}")
+#                 return
+#             audio_bytes = bytearray(r.content)
+
+#         print(f"[TTS] Received {len(audio_bytes)} bytes, first 8: {bytes(audio_bytes[:8])}")
+
+#         if audio_bytes[:4] == b'RIFF':
+#             # Patch size fields về giá trị đúng nếu bị 0 (streaming WAV)
+#             import struct
+#             total_size = len(audio_bytes) - 8
+#             struct.pack_into('<I', audio_bytes, 4, total_size)
+
+#             # Tìm và patch 'data' chunk size
+#             offset = 12
+#             while offset < len(audio_bytes) - 8:
+#                 chunk_id = bytes(audio_bytes[offset:offset+4])
+#                 chunk_size = struct.unpack_from('<I', audio_bytes, offset+4)[0]
+#                 if chunk_id == b'data':
+#                     data_size = len(audio_bytes) - offset - 8
+#                     struct.pack_into('<I', audio_bytes, offset+4, data_size)
+#                     print(f"[TTS] Patched data chunk size: {data_size}")
+#                     break
+#                 offset += 8 + (chunk_size if chunk_size > 0 else 4)
+
+#             try:
+#                 wav_buf = io.BytesIO(bytes(audio_bytes))
+#                 with wave.open(wav_buf, 'rb') as wf:
+#                     channels = wf.getnchannels()
+#                     rate = wf.getframerate()
+#                     sampwidth = wf.getsampwidth()
+#                     pcm_data = wf.readframes(wf.getnframes())
+#                 print(f"[TTS] WAV: {channels}ch, {rate}Hz, {sampwidth*8}bit, {len(pcm_data)} bytes PCM")
+#                 fmt = pyaudio.paInt16 if sampwidth == 2 else pyaudio.paFloat32
+#             except Exception as e:
+#                 print(f"[TTS] WAV parse failed sau patch: {e}, fallback int16")
+#                 pcm_data = bytes(audio_bytes[44:])
+#                 channels, rate, fmt = 1, 24000, pyaudio.paInt16
+#         else:
+#             pcm_data = bytes(audio_bytes)
+#             channels, rate, fmt = 1, 24000, pyaudio.paInt16
+#             print(f"[TTS] Raw PCM int16")
+
+#         stream = _pyaudio.open(format=fmt, channels=channels, rate=rate, output=True)
+#         chunk_size = 4096
+#         for i in range(0, len(pcm_data), chunk_size):
+#             stream.write(pcm_data[i:i+chunk_size])
+#         stream.stop_stream()
+#         stream.close()
+#         print(f"{GREEN}[TTS] Phat xong!{RESET}")
+#         time.sleep(0.3)
+
+#     except Exception as e:
+#         print(f"{RED}[TTS] Loi phat audio: {e}{RESET}")
+#         import traceback; traceback.print_exc()
+#     finally:
+#         if mic:
+#             mic.clear()
+#             mic.is_muted.clear()
+#         _ui.notify("idle")
+#         is_playing_event.clear()
+
 def play_audio_stream(url, is_playing_event, mic=None):
     try:
         is_playing_event.set()
@@ -421,64 +493,76 @@ def play_audio_stream(url, is_playing_event, mic=None):
         if mic:
             mic.is_muted.set()
             mic.clear()
-        print(f"{CYAN}[TTS] Dang phat audio...{RESET}")
+        print(f"{CYAN}[TTS] Dang phat audio stream...{RESET}")
 
-        with requests.get(url, timeout=15) as r:
+        stream = None
+        header_parsed = False
+        header_buf = bytearray()
+        channels, rate, fmt = TTS_CHANNELS, TTS_RATE, pyaudio.paInt16
+
+        with requests.get(url, stream=True, timeout=15) as r:
             if r.status_code != 200:
                 print(f"{RED}[TTS] Loi tai audio: {r.status_code}{RESET}")
                 return
-            audio_bytes = bytearray(r.content)
 
-        print(f"[TTS] Received {len(audio_bytes)} bytes, first 8: {bytes(audio_bytes[:8])}")
+            for chunk in r.iter_content(chunk_size=4096):
+                if not chunk:
+                    continue
 
-        if audio_bytes[:4] == b'RIFF':
-            # Patch size fields về giá trị đúng nếu bị 0 (streaming WAV)
-            import struct
-            total_size = len(audio_bytes) - 8
-            struct.pack_into('<I', audio_bytes, 4, total_size)
+                if not header_parsed:
+                    header_buf.extend(chunk)
 
-            # Tìm và patch 'data' chunk size
-            offset = 12
-            while offset < len(audio_bytes) - 8:
-                chunk_id = bytes(audio_bytes[offset:offset+4])
-                chunk_size = struct.unpack_from('<I', audio_bytes, offset+4)[0]
-                if chunk_id == b'data':
-                    data_size = len(audio_bytes) - offset - 8
-                    struct.pack_into('<I', audio_bytes, offset+4, data_size)
-                    print(f"[TTS] Patched data chunk size: {data_size}")
-                    break
-                offset += 8 + (chunk_size if chunk_size > 0 else 4)
+                    # Chờ đủ header WAV (44 bytes) trước khi parse
+                    if len(header_buf) < 44:
+                        continue
 
-            try:
-                wav_buf = io.BytesIO(bytes(audio_bytes))
-                with wave.open(wav_buf, 'rb') as wf:
-                    channels = wf.getnchannels()
-                    rate = wf.getframerate()
-                    sampwidth = wf.getsampwidth()
-                    pcm_data = wf.readframes(wf.getnframes())
-                print(f"[TTS] WAV: {channels}ch, {rate}Hz, {sampwidth*8}bit, {len(pcm_data)} bytes PCM")
-                fmt = pyaudio.paInt16 if sampwidth == 2 else pyaudio.paFloat32
-            except Exception as e:
-                print(f"[TTS] WAV parse failed sau patch: {e}, fallback int16")
-                pcm_data = bytes(audio_bytes[44:])
-                channels, rate, fmt = 1, 24000, pyaudio.paInt16
-        else:
-            pcm_data = bytes(audio_bytes)
-            channels, rate, fmt = 1, 24000, pyaudio.paInt16
-            print(f"[TTS] Raw PCM int16")
+                    pcm_start = 0
+                    if header_buf[:4] == b'RIFF':
+                        try:
+                            import struct
+                            wav_buf = io.BytesIO(bytes(header_buf))
+                            with wave.open(wav_buf, 'rb') as wf:
+                                channels = wf.getnchannels()
+                                rate = wf.getframerate()
+                                sampwidth = wf.getsampwidth()
+                                fmt = pyaudio.paInt16 if sampwidth == 2 else pyaudio.paFloat32
+                                # Tính offset thực của PCM data trong header_buf
+                                pcm_start = wav_buf.tell()
+                            print(f"[TTS] WAV: {channels}ch, {rate}Hz — stream mode")
+                        except Exception:
+                            # Nếu parse thất bại, fallback: bỏ qua 44 bytes đầu
+                            pcm_start = 44
+                    else:
+                        print(f"[TTS] Raw PCM int16 — stream mode")
 
-        stream = _pyaudio.open(format=fmt, channels=channels, rate=rate, output=True)
-        chunk_size = 4096
-        for i in range(0, len(pcm_data), chunk_size):
-            stream.write(pcm_data[i:i+chunk_size])
-        stream.stop_stream()
-        stream.close()
+                    stream = _pyaudio.open(
+                        format=fmt, channels=channels, rate=rate, output=True
+                    )
+                    header_parsed = True
+
+                    # Phát phần PCM còn lại trong chunk đầu tiên
+                    pcm_chunk = bytes(header_buf[pcm_start:])
+                    if pcm_chunk:
+                        stream.write(pcm_chunk)
+                else:
+                    # Các chunk tiếp theo: phát thẳng, không cần xử lý
+                    stream.write(chunk)
+
+        if stream:
+            stream.stop_stream()
+            stream.close()
         print(f"{GREEN}[TTS] Phat xong!{RESET}")
         time.sleep(0.3)
 
     except Exception as e:
         print(f"{RED}[TTS] Loi phat audio: {e}{RESET}")
         import traceback; traceback.print_exc()
+        if stream:
+            try:
+                stream.stop_stream()
+                stream.close()
+            except Exception:
+                pass
     finally:
         if mic:
             mic.clear()
