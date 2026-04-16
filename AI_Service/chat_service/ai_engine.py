@@ -54,6 +54,11 @@ CONCISE_RULE = (
     "Cấu trúc: 1 câu trả lời chính → 1-2 câu giải thích → 1 câu kết luận hoặc gợi ý tiếp theo."
 )
 
+NO_REPEAT_GREETING_RULE = (
+    "\nQUY TẮC CHÀO HỎI: TUYỆT ĐỐI KHÔNG bắt đầu câu trả lời bằng lời chào như 'Xin chào', 'Chào bạn' "
+    "hay bất kỳ lời chào nào khác. Đi thẳng vào nội dung trả lời."
+)
+
 MAX_SENTENCES = 5
 RAG_LIMIT = 3
 
@@ -69,11 +74,12 @@ class AIEngine:
         self.embed_model = SentenceTransformer(settings.MODEL_QDRANT)
         self.collection_name = "thanhpt"
         self.chat_sessions = {}
+        self.greeted_users = set()  # track user đã được chào chưa
 
     def get_chat_session(self, uuid, group_id):
         if uuid not in self.chat_sessions:
             content = redis_manager.get_cache(f"group:{group_id}:content") or ""
-            system_instruction = content + IDENTITY_RULE + CONCISE_RULE
+            system_instruction = content + IDENTITY_RULE + CONCISE_RULE + NO_REPEAT_GREETING_RULE
             self.chat_sessions[uuid] = self.client.chats.create(
                 model=settings.MODEL_NAME,
                 config={"system_instruction": system_instruction},
@@ -127,9 +133,13 @@ class AIEngine:
         try:
             chat = self.get_chat_session(uuid, group_id)
 
-            # Câu chào hỏi → trả lời chào, không gọi AI
+            # Câu chào hỏi → chỉ chào lần đầu tiên
             if self._is_greeting(prompt):
-                return GREETING_RESPONSE
+                if uuid not in self.greeted_users:
+                    self.greeted_users.add(uuid)
+                    return GREETING_RESPONSE
+                else:
+                    return "Bạn cần tư vấn về vấn đề gì?"
 
             # Câu hỏi về danh tính → chặn trước khi gọi AI
             if self._is_identity_question(prompt):
@@ -149,7 +159,8 @@ class AIEngine:
     def delete_session(self, uuid):
         if uuid in self.chat_sessions:
             del self.chat_sessions[uuid]
-            print(f"🗑 Xóa session: {uuid}")
+        self.greeted_users.discard(uuid)  # reset trạng thái chào khi user disconnect
+        print(f"🗑 Xóa session: {uuid}")
 
 
 if __name__ == "__main__":
