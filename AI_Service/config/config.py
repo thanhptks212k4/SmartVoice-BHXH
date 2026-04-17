@@ -13,7 +13,8 @@ class Settings(BaseSettings):
         MODEL_QDRANT : str = "MODEL_QDRANT"
         model_config = SettingsConfigDict(
         env_file=os.path.join(BASE_DIR, ".env"),  
-        env_file_encoding='utf-8'
+        env_file_encoding='utf-8',
+        extra='ignore'
     )
 
 
