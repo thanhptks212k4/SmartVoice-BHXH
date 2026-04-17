@@ -54,9 +54,20 @@ CHECKPOINT_DIR = _resolve_checkpoint_dir()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+def _resolve_wav(filename):
+    """Tim file wav: uu tien Drive, fallback ve local model/"""
+    drive_path = os.path.join(DRIVE_MODEL_DIR, filename)
+    if os.path.isfile(drive_path):
+        return drive_path
+    local_path = os.path.join("model", filename)
+    if os.path.isfile(local_path):
+        logger.info("Dung wav local: %s", local_path)
+        return local_path
+    raise FileNotFoundError(f"Khong tim thay file wav: {filename} (Drive: {drive_path}, local: {local_path})")
+
 VOICE_PROFILES={
     "nuhanoi":{
-        "audio": f"{MODEL_DIR}giongnuhanoi6s.wav",
+        "audio": _resolve_wav("giongnuhanoi6s.wav"),
         "inference": {
             "temperature": 0.7,
             "top_p": 0.80,
@@ -68,7 +79,7 @@ VOICE_PROFILES={
         }
     },
     "nutreem":{
-        "audio": f"{MODEL_DIR}hn_nganha_begai.wav",
+        "audio": _resolve_wav("hn_nganha_begai.wav"),
         "inference": {
             "temperature": 0.7,
             "top_p": 0.80,
@@ -80,7 +91,6 @@ VOICE_PROFILES={
         }
     }
 }
-
 
 # ---------- Singleton model loader ----------
 XTTS_MODEL = None

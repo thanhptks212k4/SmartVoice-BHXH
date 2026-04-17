@@ -41,30 +41,53 @@ def setup_finetuned_model():
         for f in required:
             size_mb = os.path.getsize(os.path.join(DRIVE_MODEL_DIR, f)) / (1024 * 1024)
             print(f"     {f} ({size_mb:.1f} MB)")
-        return True
+    else:
+        os.makedirs(DRIVE_MODEL_DIR, exist_ok=True)
+        print(f"[DOWNLOAD] Dang tai tu HuggingFace: anhnh2002/vnTTS")
+        print("Co the mat 10-20 phut...")
 
-    os.makedirs(DRIVE_MODEL_DIR, exist_ok=True)
-    print(f"[DOWNLOAD] Dang tai tu HuggingFace: anhnh2002/vnTTS")
-    print("Co the mat 10-20 phut...")
+        try:
+            snapshot_download(
+                repo_id="anhnh2002/vnTTS",
+                repo_type="model",
+                local_dir=DRIVE_MODEL_DIR,
+            )
+            print(f"[SUCCESS] Fine-tuned model da luu tai: {DRIVE_MODEL_DIR}")
+            for f in required:
+                path = os.path.join(DRIVE_MODEL_DIR, f)
+                if os.path.isfile(path):
+                    size_mb = os.path.getsize(path) / (1024 * 1024)
+                    print(f"  [OK] {f} ({size_mb:.1f} MB)")
+                else:
+                    print(f"  [WARN] Khong tim thay: {f}")
+        except Exception as e:
+            print(f"[ERROR] Tai fine-tuned model that bai: {e}")
+            return False
 
-    try:
-        snapshot_download(
-            repo_id="anhnh2002/vnTTS",
-            repo_type="model",
-            local_dir=DRIVE_MODEL_DIR,
-        )
-        print(f"[SUCCESS] Fine-tuned model da luu tai: {DRIVE_MODEL_DIR}")
-        for f in required:
-            path = os.path.join(DRIVE_MODEL_DIR, f)
-            if os.path.isfile(path):
-                size_mb = os.path.getsize(path) / (1024 * 1024)
-                print(f"  [OK] {f} ({size_mb:.1f} MB)")
-            else:
-                print(f"  [WARN] Khong tim thay: {f}")
-        return True
-    except Exception as e:
-        print(f"[ERROR] Tai fine-tuned model that bai: {e}")
-        return False
+    # Copy cac file wav mau giong tu local vao Drive neu chua co
+    import shutil
+    wav_files = [
+        "giongnuhanoi6s.wav",
+        "hn_nganha_begai.wav",
+        "vi_man.wav",
+        "vi_woman.wav",
+        "nutrem.wav",
+        "begai_lop_4.wav",
+    ]
+    local_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
+    print("\n[WAV] Kiem tra file wav mau giong...")
+    for wav in wav_files:
+        dest = os.path.join(DRIVE_MODEL_DIR, wav)
+        src  = os.path.join(local_model_dir, wav)
+        if os.path.isfile(dest):
+            print(f"  [SKIP] {wav} da co tren Drive")
+        elif os.path.isfile(src):
+            shutil.copy2(src, dest)
+            print(f"  [COPY] {wav} -> Drive")
+        else:
+            print(f"  [WARN] Khong tim thay {wav} o local")
+
+    return True
 
 
 # ---------- Phan 2: XTTS v2.0 original checkpoint ----------
