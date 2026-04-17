@@ -22,8 +22,36 @@ output_dir = "debug_audio"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-MODEL_DIR = "model/"
-speaker_audio_file = f"{MODEL_DIR}giongnuhanoi6s.wav" 
+# ============================================================
+# Tu dong dung duong dan Drive neu dang chay tren Colab
+# ============================================================
+DRIVE_BASE           = "/content/drive/MyDrive/DATN_PhamTienThanh/sourse_code/TTS_service"
+DRIVE_MODEL_DIR      = os.path.join(DRIVE_BASE, "model")
+DRIVE_CHECKPOINT_DIR = os.path.join(DRIVE_BASE, "checkpoints", "XTTS_v2.0_original_model_files")
+
+def _resolve_model_dir():
+    required = ["model.pth", "config.json", "vocab.json"]
+    if os.path.isdir(DRIVE_MODEL_DIR) and all(
+        os.path.isfile(os.path.join(DRIVE_MODEL_DIR, f)) for f in required
+    ):
+        logger.info("Load fine-tuned model tu Google Drive: %s", DRIVE_MODEL_DIR)
+        return DRIVE_MODEL_DIR + "/"
+    logger.info("Load fine-tuned model local: model/")
+    return "model/"
+
+def _resolve_checkpoint_dir():
+    required = ["dvae.pth", "mel_stats.pth"]
+    if os.path.isdir(DRIVE_CHECKPOINT_DIR) and all(
+        os.path.isfile(os.path.join(DRIVE_CHECKPOINT_DIR, f)) for f in required
+    ):
+        logger.info("Load checkpoint tu Google Drive: %s", DRIVE_CHECKPOINT_DIR)
+        return DRIVE_CHECKPOINT_DIR + "/"
+    logger.info("Load checkpoint local: checkpoints/XTTS_v2.0_original_model_files/")
+    return "checkpoints/XTTS_v2.0_original_model_files/"
+
+MODEL_DIR      = _resolve_model_dir()
+CHECKPOINT_DIR = _resolve_checkpoint_dir()
+
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 VOICE_PROFILES={
@@ -38,7 +66,6 @@ VOICE_PROFILES={
             "num_beams": 1,
             "length_penalty": 1.0,
         }
-
     },
     "nutreem":{
         "audio": f"{MODEL_DIR}hn_nganha_begai.wav",
@@ -51,7 +78,6 @@ VOICE_PROFILES={
             "num_beams": 1,
             "length_penalty": 1.0,
         }
-
     }
 }
 
@@ -80,8 +106,7 @@ def load_model():
             checkpoint_path=f"{MODEL_DIR}model.pth",
             vocab_path=f"{MODEL_DIR}vocab.json",
             use_deepspeed=False
-        )
-        XTTS_MODEL.to(device)
+        )        XTTS_MODEL.to(device)
         logger.info("Mô hình XTTS đã load thành công.")
     except Exception as e:
         logger.error("FATAL: Không thể load mô hình XTTS: %s", e, exc_info=True)
