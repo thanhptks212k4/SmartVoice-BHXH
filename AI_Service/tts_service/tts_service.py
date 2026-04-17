@@ -106,7 +106,8 @@ def load_model():
             checkpoint_path=f"{MODEL_DIR}model.pth",
             vocab_path=f"{MODEL_DIR}vocab.json",
             use_deepspeed=False
-        )        XTTS_MODEL.to(device)
+        )
+        XTTS_MODEL.to(device)
         logger.info("Mô hình XTTS đã load thành công.")
     except Exception as e:
         logger.error("FATAL: Không thể load mô hình XTTS: %s", e, exc_info=True)
