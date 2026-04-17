@@ -178,11 +178,19 @@ def normalize_text(text: str) -> str:
     text = re.sub(r'(?<=\d)\s*[xX]\s*(?=[\d(])', ' nhân ', text)
 
     # 3. Xu ly phan tram: "8%" -> "tam phan tram"
+    # Xu ly so thap phan dung dau cham + % (VD: 17.5%, 10.5%, 0.5%)
     text = re.sub(
-        r'(\d+),(\d+)\s*%',
-        lambda m: _convert_decimal_number(m) + " phần trăm",
+        r'(\d+)\.(\d+)\s*%',
+        lambda m: number_to_vietnamese(int(m.group(1))) + " phẩy " + number_to_vietnamese(int(m.group(2))) + " phần trăm",
         text
     )
+    # Xu ly so thap phan dung dau phay + % (VD: 17,5%)
+    text = re.sub(
+        r'(\d+),(\d+)\s*%',
+        lambda m: number_to_vietnamese(int(m.group(1))) + " phẩy " + number_to_vietnamese(int(m.group(2))) + " phần trăm",
+        text
+    )
+    # Xu ly so nguyen + %
     text = re.sub(
         r'(\d+)\s*%',
         lambda m: number_to_vietnamese(int(m.group(1))) + " phần trăm",
@@ -228,6 +236,13 @@ def normalize_text(text: str) -> str:
 
     # 6. Xu ly so co dau cham phan cach hang nghin (VD: 10.000.000)
     text = re.sub(r'\d{1,3}(?:\.\d{3})+', _convert_number_with_dot_separator, text)
+
+    # 6.5. Xu ly so thap phan dung dau cham con lai (VD: 17.5 khong co %)
+    text = re.sub(
+        r'(\d+)\.(\d+)',
+        lambda m: number_to_vietnamese(int(m.group(1))) + " phẩy " + number_to_vietnamese(int(m.group(2))),
+        text
+    )
 
     # 7. Xu ly so thap phan (VD: 3,5)
     text = re.sub(r'(\d+),(\d+)', _convert_decimal_number, text)
