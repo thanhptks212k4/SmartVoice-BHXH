@@ -100,10 +100,18 @@ class SileroVAD:
 def run_stt(audio_np):
     """audio_np: float32 numpy array 16kHz mono"""
     if STT_ENGINE == "whisper":
-        result = whisper_model.transcribe(audio_np, language="vi", fp16=False,
-                                          condition_on_previous_text=False,
-                                          no_speech_threshold=0.6,
-                                          logprob_threshold=-1.0)
+        result = whisper_model.transcribe(
+            audio_np,
+            language="vi",
+            fp16=False,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.6,
+            logprob_threshold=-1.0,
+            temperature=0.0,          # greedy decode, ít hallucination hơn
+            beam_size=5,              # beam search cho kết quả tốt hơn
+            best_of=5,
+            task="transcribe",        # không dịch, chỉ nhận dạng
+        )
         text = result["text"].strip()
         # Bỏ qua hallucination: chứa token đặc biệt hoặc quá ngắn
         if "<|" in text or len(text) < 2:
