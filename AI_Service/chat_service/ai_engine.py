@@ -111,7 +111,26 @@ class AIEngine:
             print(f"[Qdrant Error] {e}")
             return ""
 
+    @staticmethod
+    def _strip_greeting(text):
+        """Xóa lời chào ở đầu câu trả lời của Gemini."""
+        greeting_prefixes = [
+            r"^xin chào[!,.]?\s*(bạn[!,.]?)?\s*",
+            r"^chào\s*(bạn[!,.]?)?\s*",
+            r"^hello[!,.]?\s*",
+            r"^xin chào[!,.]?\s*tôi là trợ lý ảo tư vấn bảo hiểm xã hội[!,.]?\s*",
+            r"^chào bạn[!,.]?\s*tôi là trợ lý ảo tư vấn bảo hiểm xã hội[!,.]?\s*",
+        ]
+        normalized = text.strip()
+        for pattern in greeting_prefixes:
+            normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE).strip()
+        # Viết hoa chữ cái đầu sau khi strip
+        if normalized:
+            normalized = normalized[0].upper() + normalized[1:]
+        return normalized
+
     def _truncate_response(self, text):
+        text = self._strip_greeting(text)
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
         if len(sentences) > MAX_SENTENCES:
             sentences = sentences[:MAX_SENTENCES]

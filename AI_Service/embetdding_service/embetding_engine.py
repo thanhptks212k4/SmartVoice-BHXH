@@ -113,6 +113,20 @@ def extract_text(file_path):
         elif ext == ".docx":
             doc = docx.Document(file_path)
             return "\n".join([p.text for p in doc.paragraphs])
+        elif ext == ".doc":
+            # Dùng antiword (cần cài: apt-get install antiword)
+            import subprocess
+            result = subprocess.run(
+                ["antiword", str(file_path)],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0:
+                return result.stdout
+            # Fallback: thử đọc raw text nếu antiword không có
+            print(f"  [WARN] antiword thất bại, thử đọc raw: {result.stderr.strip()}")
+            with open(file_path, "rb") as f:
+                raw = f.read()
+            return raw.decode("utf-8", errors="ignore")
     except Exception as e:
         print(f" Lỗi đọc file {file_path.name}: {e}")
     return ""
@@ -129,7 +143,7 @@ def process_embedding_for_user(user_id, group_id, base):
 
     # Duyệt từng file trong thư mục
     for file_path in user_dir.glob("*"):
-        if file_path.suffix.lower() in [".txt", ".docx"]:
+        if file_path.suffix.lower() in [".txt", ".docx", ".doc"]:
             print(f"\n[🔄 ĐANG XỬ LÝ] Bắt đầu trích xuất và embedding file: {file_path.name}")
             content = extract_text(file_path)
             
