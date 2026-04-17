@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import docx
 from pathlib import Path
@@ -32,6 +33,77 @@ def init_storage():
 
 init_storage()
 
+def smart_chunk(text, max_chars=600, overlap_chars=100):
+    """
+    Chia văn bản thành các chunk thông minh:
+    - Ưu tiên cắt theo đoạn văn (\\n\\n), rồi theo câu
+    - Có overlap giữa các chunk để không mất ngữ cảnh
+    - Không cắt đứt giữa câu
+    """
+    # Chuẩn hóa khoảng trắng thừa
+    text = re.sub(r"\n{3,}", "\n\n", text.strip())
+
+    # Tách thành các đoạn văn trước
+    paragraphs = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+
+    # Tách câu trong mỗi đoạn (hỗ trợ dấu câu tiếng Việt)
+    def split_sentences(para):
+        sentences = re.split(r"(?<=[.!?;])\s+", para)
+        return [s.strip() for s in sentences if s.strip()]
+
+    all_sentences = []
+    for para in paragraphs:
+        sentences = split_sentences(para)
+        all_sentences.extend(sentences)
+        all_sentences.append("")  # dấu hiệu ngắt đoạn
+
+    chunks = []
+    current_chunk = []
+    current_len = 0
+
+    for sentence in all_sentences:
+        # Gặp dấu ngắt đoạn → flush nếu chunk đủ dài
+        if sentence == "":
+            if current_len >= max_chars * 0.4:  # flush nếu đã >= 40% max
+                chunks.append(" ".join(current_chunk))
+                # Giữ lại overlap: lấy các câu cuối cho đến khi đủ overlap_chars
+                overlap = []
+                overlap_len = 0
+                for s in reversed(current_chunk):
+                    if overlap_len + len(s) > overlap_chars:
+                        break
+                    overlap.insert(0, s)
+                    overlap_len += len(s)
+                current_chunk = overlap
+                current_len = overlap_len
+            continue
+
+        sentence_len = len(sentence)
+
+        # Nếu thêm câu này vượt max → flush trước
+        if current_len + sentence_len > max_chars and current_chunk:
+            chunks.append(" ".join(current_chunk))
+            # Giữ overlap
+            overlap = []
+            overlap_len = 0
+            for s in reversed(current_chunk):
+                if overlap_len + len(s) > overlap_chars:
+                    break
+                overlap.insert(0, s)
+                overlap_len += len(s)
+            current_chunk = overlap
+            current_len = overlap_len
+
+        current_chunk.append(sentence)
+        current_len += sentence_len
+
+    # Flush phần còn lại
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return [c for c in chunks if c.strip()]
+
+
 def extract_text(file_path):
     ext = file_path.suffix.lower()
     try:
@@ -64,8 +136,8 @@ def process_embedding_for_user(user_id, group_id, base):
             if not content.strip():
                 continue
 
-            # Chia nhỏ văn bản của file hiện tại
-            chunks = [content[i:i+600] for i in range(0, len(content), 600)]
+            # Chia nhỏ văn bản thông minh theo câu + overlap
+            chunks = smart_chunk(content, max_chars=600, overlap_chars=100)
             
             # Tạo vector cho file hiện tại
             vectors = model.encode(chunks).tolist()
