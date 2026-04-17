@@ -63,7 +63,10 @@ SCOPE_RULE = (
     "\nPHẠM VI TƯ VẤN: Bạn CHỈ được trả lời các câu hỏi liên quan đến bảo hiểm xã hội (BHXH), "
     "bao gồm: chế độ ốm đau, thai sản, tai nạn lao động, hưu trí, tử tuất, thất nghiệp, "
     "mức đóng BHXH, hồ sơ thủ tục, quyền lợi người lao động. "
-    "Nếu câu hỏi KHÔNG liên quan đến BHXH, hãy từ chối lịch sự và đề nghị người dùng hỏi về BHXH."
+    "Các câu hỏi tiếp nối hội thoại (như 'thật không?', 'tại sao?', 'ví dụ?', 'còn gì nữa không?') "
+    "được coi là liên quan đến chủ đề BHXH đang thảo luận và PHẢI được trả lời. "
+    "Nếu câu hỏi RÕ RÀNG không liên quan đến BHXH (hỏi về thời tiết, ẩm thực, giải trí, v.v.), "
+    "hãy từ chối lịch sự bằng 1 câu ngắn và mời người dùng hỏi về BHXH."
 )
 
 NO_REPEAT_GREETING_RULE = (
@@ -150,91 +153,6 @@ class AIEngine:
                 sentences[-1] += "."
         return " ".join(sentences)
 
-    # Từ khóa liên quan BHXH — nếu không có bất kỳ từ nào thì out-of-scope
-    BHXH_KEYWORDS = [
-        # --- Tên viết tắt & tổ chức ---
-        "bảo hiểm", "bhxh", "bhyt", "bhtn", "bảo hiểm xã hội", "bảo hiểm y tế",
-        "bảo hiểm thất nghiệp", "cơ quan bhxh", "bảo hiểm tự nguyện",
-        "bảo hiểm bắt buộc", "quỹ bhxh", "quỹ bảo hiểm", "luật bhxh",
-        "luật bảo hiểm xã hội", "luật bảo hiểm y tế",
-
-        # --- Chế độ & quyền lợi ---
-        "chế độ", "hưu trí", "lương hưu", "nghỉ hưu", "tuổi nghỉ hưu",
-        "ốm đau", "thai sản", "nghỉ thai sản", "nghỉ sinh", "sinh con",
-        "tai nạn lao động", "tnlđ", "bệnh nghề nghiệp", "tử tuất",
-        "thất nghiệp", "trợ cấp thất nghiệp", "trợ cấp ốm đau",
-        "trợ cấp thai sản", "trợ cấp hưu trí", "trợ cấp tử tuất",
-        "trợ cấp một lần", "trợ cấp hàng tháng", "trợ cấp",
-        "mai táng phí", "tiền tuất", "tiền dưỡng sức",
-        "dưỡng sức phục hồi sức khỏe", "phục hồi sức khỏe",
-
-        # --- Đóng & mức đóng ---
-        "mức đóng", "đóng bảo hiểm", "đóng bhxh", "đóng bhyt", "đóng bhtn",
-        "tỷ lệ đóng", "mức đóng góp", "đóng góp", "căn cứ đóng",
-        "tiền đóng", "phí bảo hiểm", "đóng thiếu", "đóng bù",
-        "truy đóng", "hoàn trả", "hoàn tiền bhxh", "rút bhxh",
-        "rút bảo hiểm xã hội", "nhận bảo hiểm", "hưởng bhxh",
-        "hưởng bảo hiểm", "giải quyết chế độ",
-
-        # --- Thời gian đóng & điều kiện ---
-        "thời gian đóng", "năm đóng", "tháng đóng", "đủ năm đóng",
-        "thiếu năm đóng", "gián đoạn đóng", "bảo lưu", "bảo lưu thời gian",
-        "tính thời gian", "cộng nối thời gian", "thời gian làm việc",
-
-        # --- Lương & thu nhập ---
-        "lương", "tiền lương", "mức lương", "lương cơ sở", "lương tối thiểu",
-        "lương tháng", "thu nhập", "thu nhập tháng", "mức thu nhập",
-        "tiền công", "phụ cấp", "phụ cấp lương",
-
-        # --- Người lao động & sử dụng lao động ---
-        "người lao động", "người sử dụng lao động", "nld", "nsdlđ",
-        "lao động", "công nhân", "viên chức", "cán bộ", "công chức",
-        "hợp đồng lao động", "hợp đồng làm việc", "thử việc",
-        "sa thải", "nghỉ việc", "thôi việc", "chấm dứt hợp đồng",
-        "nghỉ không lương", "tạm hoãn hợp đồng",
-
-        # --- Doanh nghiệp & đơn vị ---
-        "doanh nghiệp", "công ty", "nhà nước", "cơ quan", "đơn vị",
-        "tổ chức", "hộ kinh doanh", "hợp tác xã", "cơ sở sản xuất",
-        "chủ sử dụng lao động", "chủ doanh nghiệp",
-
-        # --- Hồ sơ & thủ tục ---
-        "hồ sơ", "thủ tục", "giấy tờ", "đăng ký", "khai báo",
-        "nộp hồ sơ", "xét duyệt", "giải quyết hồ sơ", "cấp sổ",
-        "sổ bảo hiểm", "sổ bhxh", "thẻ bhyt", "thẻ bảo hiểm y tế",
-        "cấp thẻ", "gia hạn thẻ", "mất sổ", "mất thẻ",
-        "điều chỉnh thông tin", "xác nhận", "xác nhận bhxh",
-
-        # --- Khám chữa bệnh & y tế ---
-        "khám bệnh", "chữa bệnh", "khám chữa bệnh", "viện phí",
-        "chi phí khám", "thanh toán bhyt", "thanh toán bảo hiểm",
-        "cơ sở khám chữa bệnh", "bệnh viện", "phòng khám",
-        "đúng tuyến", "trái tuyến", "chuyển tuyến", "tuyến trên",
-        "tuyến dưới", "đăng ký khám ban đầu", "nơi đăng ký khám",
-        "mức hưởng bhyt", "mức thanh toán",
-
-        # --- Rủi ro & sự kiện bảo hiểm ---
-        "rủi ro", "sự kiện bảo hiểm", "tai nạn", "ốm", "bệnh",
-        "mất việc", "mất thu nhập", "già yếu", "chết", "qua đời",
-        "tàn tật", "suy giảm khả năng lao động", "thương tật",
-
-        # --- Quyền & nghĩa vụ ---
-        "quyền lợi", "nghĩa vụ", "quyền", "trách nhiệm",
-        "vi phạm", "xử phạt", "khiếu nại", "tố cáo", "tranh chấp",
-        "thanh tra", "kiểm tra bhxh",
-
-        # --- Đối tượng tham gia ---
-        "đối tượng", "tham gia bhxh", "bắt buộc tham gia",
-        "tự nguyện tham gia", "người nước ngoài", "lao động nước ngoài",
-        "lao động thời vụ", "lao động ngắn hạn", "lao động part-time",
-        "người hoạt động không chuyên trách", "xã phường thị trấn",
-    ]
-
-    @classmethod
-    def _is_out_of_scope(cls, text):
-        normalized = text.lower().strip()
-        return not any(kw in normalized for kw in cls.BHXH_KEYWORDS)
-
     @staticmethod
     def _is_greeting(text):
         normalized = text.lower().strip()
@@ -260,10 +178,6 @@ class AIEngine:
             # Câu hỏi về danh tính → chặn trước khi gọi AI
             if self._is_identity_question(prompt):
                 return IDENTITY_RESPONSE
-
-            # Câu hỏi ngoài phạm vi BHXH → từ chối
-            if self._is_out_of_scope(prompt):
-                return OUT_OF_SCOPE_RESPONSE
 
             # Gọi AI với context từ RAG
             context = self.get_context(uuid, prompt, group_id)
