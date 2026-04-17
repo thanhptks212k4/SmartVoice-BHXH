@@ -15,11 +15,16 @@ import numpy as np
 import websockets
 from scipy.signal import butter, lfilter_zi, lfilter
 import torch
+from dotenv import load_dotenv
+
+# Load .env tu thu muc cha (AI_Service/.env)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # ── Config ──
-STT_ENGINE   = os.getenv("STT_ENGINE", "google")   # "google" hoặc "whisper"
-WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
-PORT         = int(os.getenv("STT_WS_PORT", 8003))
+STT_ENGINE         = os.getenv("STT_ENGINE", "google")
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "small")
+WHISPER_MODEL_DIR  = os.getenv("WHISPER_MODEL_DIR", "AI_Service/stt_service/model")
+PORT               = int(os.getenv("STT_WS_PORT", 8003))
 
 TARGET_SR    = 16000
 SILERO_CHUNK = 512
@@ -45,8 +50,17 @@ print("[Silero] Ready!")
 whisper_model = None
 if STT_ENGINE == "whisper":
     import whisper as _whisper
-    print(f"[Whisper] Loading [{WHISPER_MODEL_NAME}]...")
-    whisper_model = _whisper.load_model(WHISPER_MODEL_NAME)
+    print(f"[Whisper] Loading [{WHISPER_MODEL_NAME}] from {WHISPER_MODEL_DIR} ...")
+    # Neu file model da co trong thu muc thi load tu do, khong download lai
+    model_file = os.path.join(WHISPER_MODEL_DIR, f"{WHISPER_MODEL_NAME}.pt")
+    if os.path.isfile(model_file):
+        whisper_model = _whisper.load_model(WHISPER_MODEL_NAME, download_root=WHISPER_MODEL_DIR)
+        print(f"[Whisper] Loaded from local: {model_file}")
+    else:
+        print(f"[Whisper] Khong tim thay {model_file}, dang download...")
+        os.makedirs(WHISPER_MODEL_DIR, exist_ok=True)
+        whisper_model = _whisper.load_model(WHISPER_MODEL_NAME, download_root=WHISPER_MODEL_DIR)
+        print(f"[Whisper] Da luu model vao: {WHISPER_MODEL_DIR}")
     print("[Whisper] Ready!")
 else:
     import speech_recognition as sr

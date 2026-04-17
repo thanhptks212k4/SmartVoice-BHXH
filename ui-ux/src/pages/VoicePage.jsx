@@ -5,7 +5,8 @@ import MascotCard from "./MascotCard";
 const BASE_URL   = import.meta.env.VITE_API_URL  || "http://localhost:3000";
 const WS_URL     = import.meta.env.VITE_WS_URL   || "ws://localhost:3000";
 const STT_WS_URL = import.meta.env.VITE_STT_WS_URL || "ws://localhost:8003";
-const VOICE      = "nuhanoi";
+const VOICE      = import.meta.env.VITE_VOICE || "nuhanoi";
+const STT_ENGINE = import.meta.env.VITE_STT_ENGINE || "google";
 
 // Browser gửi chunk 20ms @ 16kHz = 320 samples
 const CHUNK_SAMPLES = 512;
@@ -15,9 +16,6 @@ export default function VoicePage() {
   const [state, setState]       = useState("idle");
   const [botText, setBotText]   = useState("");
   const [error, setError]       = useState("");
-  const [engine, setEngine]     = useState(
-    localStorage.getItem("stt_engine") || "google"
-  );
 
   const wsRef      = useRef(null);   // Node WS
   const sttWsRef   = useRef(null);   // STT WS
@@ -84,27 +82,89 @@ export default function VoicePage() {
     });
   }, []);
 
-  // ── Phát TTS audio ──
+  // ── Phát TTS audio theo streaming ──
   const playAudio = useCallback(async (url) => {
     isPlayingRef.current = true;
     setStateBoth("speaking");
-    // Reset STT để tránh thu âm lại lúc phát
     sttWsRef.current?.send(JSON.stringify({ cmd: "reset" }));
+
     try {
-      const res     = await fetch(url);
-      const buf     = await res.arrayBuffer();
-      const ctx     = new AudioContext();
-      const decoded = await ctx.decodeAudioData(buf);
-      const src     = ctx.createBufferSource();
-      src.buffer    = decoded;
-      src.connect(ctx.destination);
-      src.start();
-      src.onended = () => {
+      const res = await fetch(url);
+      if (!res.ok || !res.body) throw new Error("Stream không khả dụng");
+
+      const ctx = new AudioContext({ sampleRate: 24000 });
+      audioCtxRef.current = ctx;
+
+      const reader = res.body.getReader();
+      let headerSkipped = false;
+      let nextStartTime = ctx.currentTime + 0.05; // buffer nhỏ 50ms
+      let receivedBytes = new Uint8Array(0);
+      const HEADER_SIZE = 44; // WAV header
+      const PCM_CHUNK   = 8192; // bytes mỗi lần decode (~170ms @ 24kHz 16bit mono)
+
+      const appendBytes = (existing, incoming) => {
+        const merged = new Uint8Array(existing.length + incoming.length);
+        merged.set(existing);
+        merged.set(incoming, existing.length);
+        return merged;
+      };
+
+      const scheduleChunk = (pcmBytes) => {
+        // pcmBytes: Int16 PCM raw
+        const samples = pcmBytes.length / 2;
+        const audioBuffer = ctx.createBuffer(1, samples, 24000);
+        const channelData = audioBuffer.getChannelData(0);
+        const view = new DataView(pcmBytes.buffer);
+        for (let i = 0; i < samples; i++) {
+          channelData[i] = view.getInt16(i * 2, true) / 32768;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(ctx.destination);
+        const startAt = Math.max(nextStartTime, ctx.currentTime + 0.01);
+        src.start(startAt);
+        nextStartTime = startAt + audioBuffer.duration;
+        return audioBuffer.duration;
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        receivedBytes = appendBytes(receivedBytes, value);
+
+        // Bỏ qua WAV header 44 bytes đầu
+        if (!headerSkipped) {
+          if (receivedBytes.length < HEADER_SIZE) continue;
+          receivedBytes = receivedBytes.slice(HEADER_SIZE);
+          headerSkipped = true;
+        }
+
+        // Phát từng chunk PCM khi đủ dữ liệu
+        while (receivedBytes.length >= PCM_CHUNK) {
+          const chunk = receivedBytes.slice(0, PCM_CHUNK);
+          receivedBytes = receivedBytes.slice(PCM_CHUNK);
+          scheduleChunk(chunk);
+        }
+      }
+
+      // Phát phần còn lại
+      if (receivedBytes.length > 1) {
+        // Đảm bảo số bytes chẵn (Int16)
+        const aligned = receivedBytes.slice(0, receivedBytes.length - (receivedBytes.length % 2));
+        if (aligned.length > 0) scheduleChunk(aligned);
+      }
+
+      // Đợi audio phát xong rồi mới reset state
+      const remaining = nextStartTime - ctx.currentTime;
+      setTimeout(() => {
         isPlayingRef.current = false;
         setStateBoth("idle");
         ctx.close();
-      };
-    } catch {
+      }, Math.max(remaining * 1000 + 200, 0));
+
+    } catch (err) {
+      console.error("[Audio] Lỗi phát:", err);
       isPlayingRef.current = false;
       setStateBoth("idle");
     }
@@ -168,15 +228,6 @@ export default function VoicePage() {
       sttWsRef.current?.close();
     };
   }, [connectSTT, startMic]);
-  // ── Đổi engine STT ──
-  const handleEngineChange = (e) => {
-    const val = e.target.value;
-    setEngine(val);
-    localStorage.setItem("stt_engine", val);
-    // Gửi lệnh đổi engine lên server (cần restart server để có hiệu lực)
-    alert(`Đổi sang ${val.toUpperCase()}. Restart STT server với STT_ENGINE=${val}`);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/");
@@ -186,10 +237,6 @@ export default function VoicePage() {
     <div style={S.bg}>
       {/* Header */}
       <div style={S.header}>
-        <select style={S.select} value={engine} onChange={handleEngineChange}>
-          <option value="google">Google STT</option>
-          <option value="whisper">Whisper</option>
-        </select>
         <button style={S.logout} onClick={handleLogout}>Đăng xuất</button>
       </div>
 

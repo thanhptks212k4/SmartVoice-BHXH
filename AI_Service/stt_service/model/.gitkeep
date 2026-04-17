@@ -1,0 +1,4 @@
+# Dat file model Whisper vao day
+# VD: small.pt, base.pt, medium.pt
+# Download tai: https://huggingface.co/openai/whisper-small
+# Hoac chay: python3 -c "import whisper; whisper.load_model('small', download_root='AI_Service/stt_service/model')"
