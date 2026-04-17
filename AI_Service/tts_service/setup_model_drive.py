@@ -71,10 +71,8 @@ def setup_finetuned_model():
         "hn_nganha_begai.wav",
         "vi_man.wav",
         "vi_woman.wav",
-        "nutrem.wav",
-        "begai_lop_4.wav",
     ]
-    local_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
+    local_model_dir = "/content/SmartVoice-BHXH/AI_Service/tts_service/model"
     print("\n[WAV] Kiem tra file wav mau giong...")
     for wav in wav_files:
         dest = os.path.join(DRIVE_MODEL_DIR, wav)
@@ -83,9 +81,9 @@ def setup_finetuned_model():
             print(f"  [SKIP] {wav} da co tren Drive")
         elif os.path.isfile(src):
             shutil.copy2(src, dest)
-            print(f"  [COPY] {wav} -> Drive")
+            print(f"  [COPY] {wav} -> Drive OK")
         else:
-            print(f"  [WARN] Khong tim thay {wav} o local")
+            print(f"  [WARN] Khong tim thay {wav} tai {src}")
 
     return True
 
