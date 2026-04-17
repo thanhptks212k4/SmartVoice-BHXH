@@ -1,5 +1,6 @@
 from fastapi import FastAPI , HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json, os, struct, time, asyncio
 import logging
@@ -23,6 +24,13 @@ STREAM_GET_TIMEOUT = settings.STREAM_GET_TIMEOUT
 
 app = FastAPI()
 
+# Cho phep browser fetch audio tu bat ky origin
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 audio_buffers = {}
 
 
