@@ -33,7 +33,18 @@ COLLECTION_NAME = "thanhpt"
 client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
-def show_info():
+def _confirm(msg: str) -> bool:
+    if _AUTO_YES:
+        print(msg + "yes (auto)")
+        return True
+    print(msg, end="", flush=True)
+    try:
+        answer = sys.stdin.readline().strip().lower()
+    except Exception:
+        answer = ""
+    return answer == "yes"
+
+_AUTO_YES = False
     if not client.collection_exists(COLLECTION_NAME):
         print(f"[INFO] Collection '{COLLECTION_NAME}' chua ton tai.")
         return
@@ -48,11 +59,10 @@ def show_info():
 def delete_all():
     """Xoa toan bo collection va tao lai."""
     if client.collection_exists(COLLECTION_NAME):
-        confirm = input(
+        if not _confirm(
             f"\n[WARN] Se XOA TOAN BO collection '{COLLECTION_NAME}'.\n"
             f"       Nhap 'yes' de xac nhan: "
-        ).strip().lower()
-        if confirm != "yes":
+        ):
             print("[ABORT] Da huy.")
             return
 
@@ -91,11 +101,10 @@ def delete_by_group(group_id: str):
         print(f"[INFO] Khong co vector nao voi groupId='{group_id}'.")
         return
 
-    confirm = input(
+    if not _confirm(
         f"\n[WARN] Se xoa {count_before} vectors cua groupId='{group_id}'.\n"
         f"       Nhap 'yes' de xac nhan: "
-    ).strip().lower()
-    if confirm != "yes":
+    ):
         print("[ABORT] Da huy.")
         return
 
@@ -126,11 +135,10 @@ def delete_by_user(user_id: str):
         print(f"[INFO] Khong co vector nao voi userId='{user_id}'.")
         return
 
-    confirm = input(
+    if not _confirm(
         f"\n[WARN] Se xoa {count_before} vectors cua userId='{user_id}'.\n"
         f"       Nhap 'yes' de xac nhan: "
-    ).strip().lower()
-    if confirm != "yes":
+    ):
         print("[ABORT] Da huy.")
         return
 
@@ -153,7 +161,11 @@ def main():
     )
     parser.add_argument("--group-id", help="groupId can xoa (dung voi --mode group)")
     parser.add_argument("--user-id",  help="userId can xoa (dung voi --mode user)")
+    parser.add_argument("--yes", "-y", action="store_true", help="Tu dong xac nhan, khong hoi lai")
     args = parser.parse_args()
+
+    global _AUTO_YES
+    _AUTO_YES = args.yes
 
     print(f"\n[Qdrant] {settings.QDRANT_HOST}:{settings.QDRANT_PORT} | Collection: {COLLECTION_NAME}")
     show_info()
