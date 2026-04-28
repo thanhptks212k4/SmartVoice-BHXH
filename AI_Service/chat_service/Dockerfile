@@ -6,8 +6,8 @@ WORKDIR /app
 # Cài đặt thư viện (Dùng file requirements của chat_service)
 COPY chat_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-AI_Service
-# Copy toàn bộ nội dung từ  vào /app
+
+# Copy toàn bộ nội dung từ AI_Service vào /app
 COPY . .
 
 # Đặt PYTHONPATH để Python nhận diện thư mục gốc /app là nơi chứa module 'config'
