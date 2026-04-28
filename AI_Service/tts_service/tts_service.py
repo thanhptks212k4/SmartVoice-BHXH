@@ -77,18 +77,6 @@ VOICE_PROFILES={
             "num_beams": 1,
             "length_penalty": 1.0,
         }
-    },
-    "nutreem":{
-        "audio": _resolve_wav("hn_nganha_begai.wav"),
-        "inference": {
-            "temperature": 0.7,
-            "top_p": 0.80,
-            "top_k": 8,
-            "speed": 1.0,
-            "repetition_penalty": 20.0,
-            "num_beams": 1,
-            "length_penalty": 1.0,
-        }
     }
 }
 
