@@ -34,86 +34,86 @@ services:
     volumes:
       - ./qdrant_data:/qdrant/storage
 
-  # ─── Backend Node.js ───────────────────────────────────────
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: voice-ai-backend
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      PORT: 3000
-      HOST_REDIS: redis
-      PORT_REDIS: 6379
-      PASS_REDIS: 21022004
-      HOST_DB: db
-      NAME_DB: ai_voice_app
-      USER_DB: admin
-      PASS_DB: voice-ai-db
-      AUTH_TOKEN: ${AUTH_TOKEN}
-      STT_WS_PORT: 8003
-    depends_on:
-      - db
-      - redis
+  # # ─── Backend Node.js ───────────────────────────────────────
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: voice-ai-backend
+  #   restart: always
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     PORT: 3000
+  #     HOST_REDIS: redis
+  #     PORT_REDIS: 6379
+  #     PASS_REDIS: 21022004
+  #     HOST_DB: db
+  #     NAME_DB: ai_voice_app
+  #     USER_DB: admin
+  #     PASS_DB: voice-ai-db
+  #     AUTH_TOKEN: ${AUTH_TOKEN}
+  #     STT_WS_PORT: 8003
+  #   depends_on:
+  #     - db
+  #     - redis
 
-  # ─── AI Chat Worker ────────────────────────────────────────
-  ai_worker:
-    build:
-      context: ./AI_Service
-      dockerfile: chat_service/Dockerfile
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: 21022004
-      API_LLM: ${API_LLM}
-      MODEL_NAME: ${MODEL_NAME:-gemini-2.5-flash-lite}
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      MODEL_QDRANT: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-    depends_on:
-      - redis
-      - qdrant
-    deploy:
-      replicas: 2
+  # # ─── AI Chat Worker ────────────────────────────────────────
+  # ai_worker:
+  #   build:
+  #     context: ./AI_Service
+  #     dockerfile: chat_service/Dockerfile
+  #   restart: always
+  #   environment:
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: 21022004
+  #     API_LLM: ${API_LLM}
+  #     MODEL_NAME: ${MODEL_NAME:-gemini-2.5-flash-lite}
+  #     QDRANT_HOST: qdrant
+  #     QDRANT_PORT: 6333
+  #     MODEL_QDRANT: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  #   depends_on:
+  #     - redis
+  #     - qdrant
+  #   deploy:
+  #     replicas: 2
 
-  # ─── STT WebSocket Server ──────────────────────────────────
-  stt:
-    build:
-      context: ./AI_Service
-      dockerfile: stt_service/Dockerfile
-    container_name: voice-ai-stt
-    restart: always
-    ports:
-      - "8003:8003"
-    environment:
-      STT_ENGINE: ${STT_ENGINE:-google}
-      WHISPER_MODEL: ${WHISPER_MODEL:-small}
-      WHISPER_MODEL_DIR: /app/stt_service/model
-      STT_WS_PORT: 8003
-    volumes:
-      - ./AI_Service/stt_service/model:/app/stt_service/model
+  # # ─── STT WebSocket Server ──────────────────────────────────
+  # stt:
+  #   build:
+  #     context: ./AI_Service
+  #     dockerfile: stt_service/Dockerfile
+  #   container_name: voice-ai-stt
+  #   restart: always
+  #   ports:
+  #     - "8003:8003"
+  #   environment:
+  #     STT_ENGINE: ${STT_ENGINE:-google}
+  #     WHISPER_MODEL: ${WHISPER_MODEL:-small}
+  #     WHISPER_MODEL_DIR: /app/stt_service/model
+  #     STT_WS_PORT: 8003
+  #   volumes:
+  #     - ./AI_Service/stt_service/model:/app/stt_service/model
 
-  # ─── Frontend React ────────────────────────────────────────
-  frontend:
-    build:
-      context: ./ui-ux
-      dockerfile: Dockerfile
-    container_name: voice-ai-frontend
-    restart: always
-    ports:
-      - "5173:5173"
-    environment:
-      VITE_API_URL: http://localhost:3000
-      VITE_WS_URL: ws://localhost:3000
-      VITE_STT_WS_URL: ws://localhost:8003
-      VITE_STT_ENGINE: google
-      VITE_VOICE: nuhanoi
-    depends_on:
-      - backend
-      - stt
+  # # ─── Frontend React ────────────────────────────────────────
+  # frontend:
+  #   build:
+  #     context: ./ui-ux
+  #     dockerfile: Dockerfile
+  #   container_name: voice-ai-frontend
+  #   restart: always
+  #   ports:
+  #     - "5173:5173"
+  #   environment:
+  #     VITE_API_URL: http://localhost:3000
+  #     VITE_WS_URL: ws://localhost:3000
+  #     VITE_STT_WS_URL: ws://localhost:8003
+  #     VITE_STT_ENGINE: google
+  #     VITE_VOICE: nuhanoi
+  #   depends_on:
+  #     - backend
+  #     - stt
 
 volumes:
   pgdata:
