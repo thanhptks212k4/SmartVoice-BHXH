@@ -266,10 +266,14 @@ export default function VoicePage() {
 
   return (
     <div style={S.bg}>
-      {/* Title Header */}
+      {/* Title Header - Centered at top */}
       <div style={S.titleContainer}>
-        <h1 style={S.mainTitle}>⚖️ TRỢ LÝ ẢO TIẾNG VIỆT</h1>
-        <p style={S.subtitle}>TƯ VẤN BẢO HIỂM XÃ HỘI</p>
+        <div style={S.titleBox}>
+          <span style={S.icon}>⚖️</span>
+          <h1 style={S.mainTitle}>
+            TRỢ LÝ ẢO TIẾNG VIỆT TƯ VẤN BẢO HIỂM XÃ HỘI
+          </h1>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -278,15 +282,7 @@ export default function VoicePage() {
 
         <MascotCard state={state} />
 
-        {botText && (
-          <div style={S.bubble}>
-            <p style={S.bubbleText}>{botText}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Footer with Logout */}
-      <div style={S.footer}>
+        {/* Logout button right below mascot */}
         <button 
           style={{
             ...S.logoutBtn,
@@ -298,6 +294,12 @@ export default function VoicePage() {
         >
           🚪 Đăng xuất
         </button>
+
+        {botText && (
+          <div style={S.bubble}>
+            <p style={S.bubbleText}>{botText}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -308,33 +310,44 @@ const S = {
     minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between", // Đẩy footer xuống dưới
+    justifyContent: "flex-start",
     alignItems: "center",
     background: "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)",
     position: "relative",
     padding: "20px",
   },
   titleContainer: {
-    position: "absolute",
-    top: 20,
-    left: 20,
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    paddingTop: 30,
+    paddingBottom: 40,
+  },
+  titleBox: {
     display: "flex",
     flexDirection: "column",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: 16,
+    padding: "24px 40px",
+    background: "rgba(26, 26, 46, 0.6)",
+    borderRadius: 20,
+    border: "1px solid rgba(124, 77, 255, 0.3)",
+    boxShadow: "0 8px 32px rgba(124, 77, 255, 0.15)",
+    backdropFilter: "blur(10px)",
+  },
+  icon: {
+    fontSize: 48,
+    filter: "drop-shadow(0 4px 12px rgba(255, 215, 0, 0.5))",
   },
   mainTitle: {
     color: "#7c4dff",
     margin: 0,
     fontSize: 22,
     fontWeight: 700,
-    letterSpacing: "0.5px",
-    textShadow: "0 2px 8px rgba(124, 77, 255, 0.3)",
-  },
-  subtitle: {
-    color: "#aaa",
-    margin: "4px 0 0 0",
-    fontSize: 14,
-    fontWeight: 500,
+    letterSpacing: "1px",
+    textShadow: "0 2px 12px rgba(124, 77, 255, 0.5)",
+    textAlign: "center",
+    lineHeight: 1.4,
   },
   mainContent: {
     flex: 1,
@@ -371,12 +384,6 @@ const S = {
     fontSize: 15,
     lineHeight: 1.7,
   },
-  footer: {
-    width: "100%",
-    display: "flex",
-    justifyContent: "center",
-    paddingBottom: 20,
-  },
   logoutBtn: {
     background: "rgba(255, 82, 82, 0.1)",
     border: "1px solid rgba(255, 82, 82, 0.3)",
@@ -387,6 +394,7 @@ const S = {
     fontSize: 14,
     fontWeight: 600,
     transition: "all 0.3s ease",
+    marginTop: 12,
   },
   logoutBtnHover: {
     background: "rgba(255, 82, 82, 0.2)",
