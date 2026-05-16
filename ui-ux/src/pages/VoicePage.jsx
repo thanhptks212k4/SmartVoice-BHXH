@@ -16,6 +16,7 @@ export default function VoicePage() {
   const [state, setState]       = useState("idle");
   const [botText, setBotText]   = useState("");
   const [error, setError]       = useState("");
+  const [logoutHover, setLogoutHover] = useState(false);
 
   const wsRef      = useRef(null);   // Node WS
   const sttWsRef   = useRef(null);   // STT WS
@@ -28,6 +29,29 @@ export default function VoicePage() {
   const [micReady, setMicReady] = useState(false);
 
   const setStateBoth = (s) => { stateRef.current = s; setState(s); };
+
+  // Inject CSS animation
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes pulse {
+        0%, 100% { 
+          transform: scale(1); 
+          opacity: 0.6; 
+        }
+        50% { 
+          transform: scale(1.05); 
+          opacity: 0.9; 
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   // ── Kết nối Node WebSocket ──
   useEffect(() => {
@@ -85,7 +109,7 @@ export default function VoicePage() {
   // ── Phát TTS audio theo streaming ──
   const playAudio = useCallback(async (url) => {
     isPlayingRef.current = true;
-    setStateBoth("speaking");
+    // ⚠️ KHÔNG set "speaking" ngay - đợi chunk đầu tiên
     sttWsRef.current?.send(JSON.stringify({ cmd: "reset" }));
 
     try {
@@ -97,6 +121,7 @@ export default function VoicePage() {
 
       const reader = res.body.getReader();
       let headerSkipped = false;
+      let firstChunkPlayed = false; // 🔥 Flag để set state khi audio thực sự bắt đầu
       let nextStartTime = ctx.currentTime + 0.05; // buffer nhỏ 50ms
       let receivedBytes = new Uint8Array(0);
       const HEADER_SIZE = 44; // WAV header
@@ -145,6 +170,12 @@ export default function VoicePage() {
           const chunk = receivedBytes.slice(0, PCM_CHUNK);
           receivedBytes = receivedBytes.slice(PCM_CHUNK);
           scheduleChunk(chunk);
+          
+          // 🔥 Set state "speaking" chỉ khi chunk đầu tiên được schedule
+          if (!firstChunkPlayed) {
+            firstChunkPlayed = true;
+            setStateBoth("speaking");
+          }
         }
       }
 
@@ -235,70 +266,131 @@ export default function VoicePage() {
 
   return (
     <div style={S.bg}>
-      {/* Header */}
-      <div style={S.header}>
-        <button style={S.logout} onClick={handleLogout}>Đăng xuất</button>
-      </div>
-
-      {/* Title */}
+      {/* Title Header */}
       <div style={S.titleContainer}>
-        <h1 style={S.mainTitle}>TRỢ LÝ ẢO TIẾNG VIỆT</h1>
+        <h1 style={S.mainTitle}>⚖️ TRỢ LÝ ẢO TIẾNG VIỆT</h1>
         <p style={S.subtitle}>TƯ VẤN BẢO HIỂM XÃ HỘI</p>
       </div>
 
-      {error && <p style={S.error}>{error}</p>}
+      {/* Main Content */}
+      <div style={S.mainContent}>
+        {error && <p style={S.error}>{error}</p>}
 
-      <MascotCard state={state} />
+        <MascotCard state={state} />
 
-      {botText && (
-        <div style={S.bubble}>
-          <p style={S.bubbleText}>{botText}</p>
-        </div>
-      )}
+        {botText && (
+          <div style={S.bubble}>
+            <p style={S.bubbleText}>{botText}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer with Logout */}
+      <div style={S.footer}>
+        <button 
+          style={{
+            ...S.logoutBtn,
+            ...(logoutHover ? S.logoutBtnHover : {})
+          }}
+          onClick={handleLogout}
+          onMouseEnter={() => setLogoutHover(true)}
+          onMouseLeave={() => setLogoutHover(false)}
+        >
+          🚪 Đăng xuất
+        </button>
+      </div>
     </div>
   );
 }
 
 const S = {
   bg: {
-    minHeight: "100vh", display: "flex", flexDirection: "column",
-    justifyContent: "center", alignItems: "center",
-    background: "#0f0f1a", position: "relative",
-  },
-  header: {
-    position: "absolute", top: 20, right: 20,
-    display: "flex", gap: 10, alignItems: "center",
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between", // Đẩy footer xuống dưới
+    alignItems: "center",
+    background: "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)",
+    position: "relative",
+    padding: "20px",
   },
   titleContainer: {
-    position: "absolute", top: 20, left: 20,
-    display: "flex", flexDirection: "column", alignItems: "flex-start",
+    position: "absolute",
+    top: 20,
+    left: 20,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
   },
   mainTitle: {
-    color: "#7c4dff", margin: 0, fontSize: 20, fontWeight: 700,
+    color: "#7c4dff",
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 700,
     letterSpacing: "0.5px",
+    textShadow: "0 2px 8px rgba(124, 77, 255, 0.3)",
   },
   subtitle: {
-    color: "#aaa", margin: "4px 0 0 0", fontSize: 13, fontWeight: 500,
+    color: "#aaa",
+    margin: "4px 0 0 0",
+    fontSize: 14,
+    fontWeight: 500,
   },
-  select: {
-    background: "#1a1a2e", border: "1px solid #3a3a5a",
-    color: "#aaa", borderRadius: 8, padding: "6px 10px",
-    fontSize: 13, cursor: "pointer", outline: "none",
+  mainContent: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 20,
+    width: "100%",
+    maxWidth: 500,
   },
-  logout: {
-    background: "transparent", border: "1px solid #3a3a5a",
-    color: "#888", borderRadius: 8, padding: "6px 14px",
-    cursor: "pointer", fontSize: 13,
+  error: {
+    color: "#ff5252",
+    fontSize: 14,
+    background: "rgba(255, 82, 82, 0.1)",
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "1px solid rgba(255, 82, 82, 0.3)",
   },
-  error:  { color: "#ff5252", fontSize: 13 },
   bubble: {
-    marginTop: 16, background: "#1a1a2e", border: "1px solid #2a2a4a",
-    borderRadius: 14, padding: "12px 20px", maxWidth: 360,
+    marginTop: 16,
+    background: "rgba(26, 26, 46, 0.8)",
+    border: "1px solid #2a2a4a",
+    borderRadius: 16,
+    padding: "16px 24px",
+    maxWidth: 400,
+    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+    backdropFilter: "blur(10px)",
+    animation: "fadeIn 0.3s ease-in",
   },
-  bubbleText: { color: "#ddd", margin: 0, fontSize: 14, lineHeight: 1.6 },
-  micBtn: {
-    marginBottom: 16, padding: "12px 28px", borderRadius: 12,
-    background: "#7c4dff", color: "#fff", border: "none",
-    fontSize: 15, fontWeight: 600, cursor: "pointer",
+  bubbleText: {
+    color: "#ddd",
+    margin: 0,
+    fontSize: 15,
+    lineHeight: 1.7,
+  },
+  footer: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    paddingBottom: 20,
+  },
+  logoutBtn: {
+    background: "rgba(255, 82, 82, 0.1)",
+    border: "1px solid rgba(255, 82, 82, 0.3)",
+    color: "#ff5252",
+    borderRadius: 10,
+    padding: "10px 24px",
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 600,
+    transition: "all 0.3s ease",
+  },
+  logoutBtnHover: {
+    background: "rgba(255, 82, 82, 0.2)",
+    transform: "translateY(-2px)",
+    boxShadow: "0 4px 12px rgba(255, 82, 82, 0.3)",
   },
 };
