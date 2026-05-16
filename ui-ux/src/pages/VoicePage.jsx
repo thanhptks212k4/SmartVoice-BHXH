@@ -311,16 +311,18 @@ const S = {
     width: "100vw",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-evenly",
+    justifyContent: "flex-start",
     alignItems: "center",
     background: "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)",
     overflow: "hidden",
     padding: "20px",
+    gap: "20px",
   },
   titleContainer: {
     width: "100%",
     display: "flex",
     justifyContent: "center",
+    flexShrink: 0,
   },
   titleBox: {
     display: "flex",
@@ -349,6 +351,7 @@ const S = {
     lineHeight: 1.4,
   },
   mainContent: {
+    flex: 1,
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
@@ -356,6 +359,7 @@ const S = {
     gap: 16,
     width: "100%",
     maxWidth: 500,
+    overflow: "hidden",
   },
   error: {
     color: "#ff5252",
@@ -394,7 +398,6 @@ const S = {
     fontSize: 13,
     fontWeight: 600,
     transition: "all 0.3s ease",
-    marginTop: 8,
   },
   logoutBtnHover: {
     background: "rgba(255, 82, 82, 0.2)",

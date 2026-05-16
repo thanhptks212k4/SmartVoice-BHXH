@@ -265,7 +265,6 @@ const S = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    minHeight: "100vh",
     width: "100%",
   },
   card: {
