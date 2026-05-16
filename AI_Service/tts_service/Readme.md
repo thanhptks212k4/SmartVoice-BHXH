@@ -1,200 +1,246 @@
-# XTTSv2 Finetuning Guide for New Languages
+# 🔊 TTS Service - XTTS v2 Vietnamese
 
-This guide provides instructions for finetuning XTTSv2 on a new language, using Vietnamese (`vi`) as an example.
+> Text-to-Speech service với giọng nói tiếng Việt tự nhiên
 
-[UPDATE] A finetuned model for Vietnamese is now available at [anhnh2002/vnTTS](https://huggingface.co/anhnh2002/vnTTS) on Hugging Face
+## 🎯 Giới thiệu
 
+Service này sử dụng **XTTS v2** (Coqui TTS) đã được fine-tune cho tiếng Việt để tạo giọng nói tự nhiên từ văn bản. Hỗ trợ nhiều giọng nói và streaming audio real-time.
 
-## Table of Contents
-1. [Installation](#1-installation)
-2. [Data Preparation](#2-data-preparation)
-3. [Pretrained Model Download](#3-pretrained-model-download)
-4. [Vocabulary Extension and Configuration Adjustment](#4-vocabulary-extension-and-configuration-adjustment)
-5. [DVAE Finetuning (Optional)](#5-dvae-finetuning-optional)
-6. [GPT Finetuning](#6-gpt-finetuning)
-7. [Usage Example](#7-usage-example)
+### ✨ Tính năng
 
-## 1. Installation
+- 🇻🇳 **Giọng nói tiếng Việt tự nhiên** - Fine-tuned cho tiếng Việt
+- 🎭 **Đa giọng nói** - Hỗ trợ nhiều voice profiles (nữ Hà Nội, nam miền Nam...)
+- ⚡ **Streaming** - Phát audio ngay khi sinh chunk đầu tiên
+- 🎵 **Chất lượng cao** - 24kHz, 16-bit PCM
+- 📝 **Smart chunking** - Tách câu thông minh để giọng tự nhiên
 
-First, clone the repository and install the necessary dependencies:
+---
 
-```
-git clone https://github.com/nguyenhoanganh2002/XTTSv2-Finetuning-for-New-Languages.git
-cd XTTSv2-Finetuning-for-New-Languages
+## 🚀 Cài đặt nhanh
+
+### 1. Cài đặt dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-## 2. Data Preparation
+### 2. Download model
 
-Ensure your data is organized as follows:
-
-```
-project_root/
-├── datasets-1/
-│   ├── wavs/
-│   │   ├── xxx.wav
-│   │   ├── yyy.wav
-│   │   ├── zzz.wav
-│   │   └── ...
-│   ├── metadata_train.csv
-│   ├── metadata_eval.csv
-├── datasets-2/
-│   ├── wavs/
-│   │   ├── xxx.wav
-│   │   ├── yyy.wav
-│   │   ├── zzz.wav
-│   │   └── ...
-│   ├── metadata_train.csv
-│   ├── metadata_eval.csv
-...
-│   
-├── recipes/
-├── scripts/
-├── TTS/
-└── README.md
+```bash
+python setup_model_drive.py
 ```
 
-Format your `metadata_train.csv` and `metadata_eval.csv` files as follows:
+### 3. Cấu hình
+
+Tạo file `.env`:
+```bash
+EXTERNAL_HOST=localhost
+EXTERNAL_PORT=8123
+QUEUE_MAXSIZE=50
+STREAM_GET_TIMEOUT=30
+```
+
+### 4. Chạy service
+
+```bash
+python wordker.py
+```
+
+Service sẽ chạy tại `http://localhost:8123`
+
+---
+
+## 📖 Sử dụng
+
+### API Endpoint
+
+**GET** `/stream-voice/{task_id}`
+
+Trả về audio stream dạng WAV (chunked transfer encoding)
+
+### Python Example
+
+```python
+from tts_service import generate_tts
+
+text = "Xin chào, tôi là trợ lý ảo tư vấn bảo hiểm xã hội."
+voice = "nuhanoi"  # Giọng nữ Hà Nội
+
+for audio_chunk in generate_tts(text, voice):
+    # audio_chunk: bytes (PCM 16-bit)
+    # Xử lý hoặc stream chunk này
+    pass
+```
+
+### Voice Profiles
+
+| Voice ID | Mô tả | Giới tính |
+|----------|-------|-----------|
+| `nuhanoi` | Giọng nữ Hà Nội | Nữ |
+| `giongnuhanoi6s` | Giọng nữ Hà Nội 6s | Nữ |
+| `vi_woman` | Giọng nữ chuẩn | Nữ |
+| `vi_man` | Giọng nam chuẩn | Nam |
+
+---
+
+## 🛠️ Cấu trúc thư mục
 
 ```
+tts_service/
+├── model/                    # XTTS model files
+│   ├── config.json
+│   ├── model.pth
+│   ├── vocab.json
+│   └── *.wav                # Voice samples
+├── checkpoints/             # Original XTTS checkpoints
+├── tts_service.py          # Core TTS engine
+├── wordker.py              # FastAPI worker
+├── config.py               # Configuration
+└── requirements.txt
+```
+
+---
+
+## ⚙️ Cấu hình nâng cao
+
+### Inference Parameters
+
+Chỉnh sửa trong `tts_service.py`:
+
+```python
+VOICE_PROFILES = {
+    "nuhanoi": {
+        "audio": "model/giongnuhanoi6s.wav",
+        "inference": {
+            "temperature": 0.7,      # Creativity (0.1-1.0)
+            "top_p": 0.80,           # Nucleus sampling
+            "top_k": 8,              # Top-k sampling
+            "speed": 1.0,            # Speech speed
+            "repetition_penalty": 20.0,
+            "num_beams": 1,
+            "length_penalty": 1.0,
+        }
+    }
+}
+```
+
+### Performance Tuning
+
+**CPU Mode:**
+```python
+device = "cpu"
+# Latency: ~2-3s per sentence
+```
+
+**GPU Mode:**
+```python
+device = "cuda:0"
+# Latency: ~200-400ms per sentence
+# Yêu cầu: NVIDIA GPU với 4GB+ VRAM
+```
+
+---
+
+## 🎓 Fine-tuning (Nâng cao)
+
+Nếu bạn muốn fine-tune model cho giọng nói riêng:
+
+### 1. Chuẩn bị dữ liệu
+
+```
+datasets/
+├── wavs/
+│   ├── audio001.wav
+│   ├── audio002.wav
+│   └── ...
+├── metadata_train.csv
+└── metadata_eval.csv
+```
+
+Format CSV:
+```csv
 audio_file|text|speaker_name
-wavs/xxx.wav|How do you do?|@X
-wavs/yyy.wav|Nice to meet you.|@Y
-wavs/zzz.wav|Good to see you.|@Z
+wavs/audio001.wav|Xin chào các bạn|@Speaker1
+wavs/audio002.wav|Hôm nay trời đẹp|@Speaker1
 ```
 
-## 3. Pretrained Model Download
-
-Execute the following command to download the pretrained model:
+### 2. Download pretrained model
 
 ```bash
 python download_checkpoint.py --output_path checkpoints/
 ```
 
-## 4. Vocabulary Extension and Configuration Adjustment
-
-Extend the vocabulary and adjust the configuration with:
+### 3. Extend vocabulary
 
 ```bash
-python extend_vocab_config.py --output_path=checkpoints/ --metadata_path datasets/metadata_train.csv --language vi --extended_vocab_size 2000
+python extend_vocab_config.py \
+  --output_path=checkpoints/ \
+  --metadata_path=datasets/metadata_train.csv \
+  --language=vi \
+  --extended_vocab_size=2000
 ```
 
-## 5. DVAE Finetuning (Optional)
+### 4. Fine-tune GPT
 
-To finetune the DVAE, run:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python train_dvae_xtts.py \
---output_path=checkpoints/ \
---train_csv_path=datasets/metadata_train.csv \
---eval_csv_path=datasets/metadata_eval.csv \
---language="vi" \
---num_epochs=5 \
---batch_size=512 \
---lr=5e-6
-```
-
-## 6. GPT Finetuning
-
-For GPT finetuning, execute:
-
-[OUTDATED]
 ```bash
 CUDA_VISIBLE_DEVICES=0 python train_gpt_xtts.py \
---output_path=checkpoints/ \
---train_csv_path=datasets/metadata_train.csv \
---eval_csv_path=datasets/metadata_eval.csv \
---language="vi" \
---num_epochs=5 \
---batch_size=8 \
---grad_acumm=2 \
---max_text_length=250 \
---max_audio_length=255995 \
---weight_decay=1e-2 \
---lr=5e-6 \
---save_step=2000
+  --output_path=checkpoints/ \
+  --metadatas=datasets/metadata_train.csv,datasets/metadata_eval.csv,vi \
+  --num_epochs=5 \
+  --batch_size=8 \
+  --lr=5e-6
 ```
-[UPDATE - Supports training multiple datasets. Format metadatas parameter as follows: `path_to_train_csv_dataset-1,path_to_eval_csv_dataset-1,language_dataset-1 path_to_train_csv_dataset-2,path_to_eval_csv_dataset-2,language_dataset-2 ...`]
+
+**Lưu ý**: Cần ~20 giờ audio data và GPU mạnh (RTX 3090+)
+
+---
+
+## 🐛 Troubleshooting
+
+### Model không load được
+
 ```bash
-CUDA_VISIBLE_DEVICES=0 python train_gpt_xtts.py \
---output_path checkpoints/ \
---metadatas datasets-1/metadata_train.csv,datasets-1/metadata_eval.csv,vi datasets-2/metadata_train.csv,datasets-2/metadata_eval.csv,vi \
---num_epochs 5 \
---batch_size 8 \
---grad_acumm 4 \
---max_text_length 400 \
---max_audio_length 330750 \
---weight_decay 1e-2 \
---lr 5e-6 \
---save_step 50000
+# Kiểm tra file model
+ls -lh model/
+# Cần có: config.json, model.pth, vocab.json
+
+# Download lại nếu thiếu
+python setup_model_drive.py
 ```
 
-## 7. Usage Example
+### Audio bị "bụp" đầu
 
-Here's a sample code snippet demonstrating how to use the finetuned model:
+→ Đã fix bằng cách gom chunk đầu tiên trong `wordker.py`
+
+### Giọng nói không tự nhiên
+
+→ Thử điều chỉnh `temperature` (0.5-0.9) và `repetition_penalty` (10-30)
+
+### Out of memory (GPU)
 
 ```python
-import torch
-import torchaudio
-from tqdm import tqdm
-from underthesea import sent_tokenize
-
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import Xtts
-
-# Device configuration
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-# Model paths
-xtts_checkpoint = "checkpoints/GPT_XTTS_FT-August-30-2024_08+19AM-6a6b942/best_model_99875.pth"
-xtts_config = "checkpoints/GPT_XTTS_FT-August-30-2024_08+19AM-6a6b942/config.json"
-xtts_vocab = "checkpoints/XTTS_v2.0_original_model_files/vocab.json"
-
-# Load model
-config = XttsConfig()
-config.load_json(xtts_config)
-XTTS_MODEL = Xtts.init_from_config(config)
-XTTS_MODEL.load_checkpoint(config, checkpoint_path=xtts_checkpoint, vocab_path=xtts_vocab, use_deepspeed=False)
-XTTS_MODEL.to(device)
-
-print("Model loaded successfully!")
-
-# Inference
-tts_text = "Good to see you."
-speaker_audio_file = "ref.wav"
-lang = "vi"
-
-gpt_cond_latent, speaker_embedding = XTTS_MODEL.get_conditioning_latents(
-    audio_path=speaker_audio_file,
-    gpt_cond_len=XTTS_MODEL.config.gpt_cond_len,
-    max_ref_length=XTTS_MODEL.config.max_ref_len,
-    sound_norm_refs=XTTS_MODEL.config.sound_norm_refs,
-)
-
-tts_texts = sent_tokenize(tts_text)
-
-wav_chunks = []
-for text in tqdm(tts_texts):
-    wav_chunk = XTTS_MODEL.inference(
-        text=text,
-        language=lang,
-        gpt_cond_latent=gpt_cond_latent,
-        speaker_embedding=speaker_embedding,
-        temperature=0.1,
-        length_penalty=1.0,
-        repetition_penalty=10.0,
-        top_k=10,
-        top_p=0.3,
-    )
-    wav_chunks.append(torch.tensor(wav_chunk["wav"]))
-
-out_wav = torch.cat(wav_chunks, dim=0).unsqueeze(0).cpu()
-
-# Play audio (for Jupyter Notebook)
-from IPython.display import Audio
-Audio(out_wav, rate=24000)
+# Giảm batch size hoặc chuyển sang CPU
+device = "cpu"
 ```
 
-Note: Finetuning the HiFiGAN decoder was attempted but resulted in worse performance. DVAE and GPT finetuning are sufficient for optimal results.
+---
 
-Update: If you have enough short texts in your datasets (about 20 hours), you do not need to finetune DVAE.
+## 📚 Tài liệu tham khảo
+
+- [Coqui TTS](https://github.com/coqui-ai/TTS) - Original XTTS implementation
+- [Vietnamese TTS Model](https://huggingface.co/anhnh2002/vnTTS) - Pre-trained model
+- [XTTS Paper](https://arxiv.org/abs/2406.04904) - Research paper
+
+---
+
+## 📝 License
+
+Model XTTS v2 được phát hành dưới [Coqui Public Model License](https://coqui.ai/cpml).
+
+---
+
+<div align="center">
+
+**🎤 Tạo giọng nói tiếng Việt tự nhiên với XTTS v2**
+
+</div>
