@@ -48,6 +48,17 @@ export default function VoicePage() {
           opacity: 0.9; 
         }
       }
+      /* Ẩn scrollbar */
+      body {
+        overflow: hidden;
+      }
+      ::-webkit-scrollbar {
+        display: none;
+      }
+      * {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
