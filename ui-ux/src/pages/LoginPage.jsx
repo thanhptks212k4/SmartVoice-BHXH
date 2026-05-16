@@ -37,9 +37,9 @@ export default function LoginPage() {
   return (
     <div style={S.bg}>
       <form onSubmit={handleLogin} style={S.card}>
-        <div style={S.logo}>🐾</div>
-        <h2 style={S.title}>Voice AI</h2>
-        <p style={S.sub}>Đăng nhập để bắt đầu</p>
+        <div style={S.logo}>⚖️</div>
+        <h2 style={S.title}>TRỢ LÝ ẢO TIẾNG VIỆT</h2>
+        <p style={S.sub}>TƯ VẤN BẢO HIỂM XÃ HỘI</p>
 
         <input
           style={S.input}

@@ -240,6 +240,12 @@ export default function VoicePage() {
         <button style={S.logout} onClick={handleLogout}>Đăng xuất</button>
       </div>
 
+      {/* Title */}
+      <div style={S.titleContainer}>
+        <h1 style={S.mainTitle}>TRỢ LÝ ẢO TIẾNG VIỆT</h1>
+        <p style={S.subtitle}>TƯ VẤN BẢO HIỂM XÃ HỘI</p>
+      </div>
+
       {error && <p style={S.error}>{error}</p>}
 
       <MascotCard state={state} />
@@ -262,6 +268,17 @@ const S = {
   header: {
     position: "absolute", top: 20, right: 20,
     display: "flex", gap: 10, alignItems: "center",
+  },
+  titleContainer: {
+    position: "absolute", top: 20, left: 20,
+    display: "flex", flexDirection: "column", alignItems: "flex-start",
+  },
+  mainTitle: {
+    color: "#7c4dff", margin: 0, fontSize: 20, fontWeight: 700,
+    letterSpacing: "0.5px",
+  },
+  subtitle: {
+    color: "#aaa", margin: "4px 0 0 0", fontSize: 13, fontWeight: 500,
   },
   select: {
     background: "#1a1a2e", border: "1px solid #3a3a5a",
