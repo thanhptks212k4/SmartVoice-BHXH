@@ -98,11 +98,15 @@ export default function VoicePage() {
 
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
+        console.log("[STT-WS] Received:", data); // Debug log
         if (data.event === "speech_start") {
+          console.log("[STT-WS] Speech started"); // Debug log
           setStateBoth("listening");
         } else if (data.event === "speech_end") {
+          console.log("[STT-WS] Speech ended"); // Debug log
           setStateBoth("idle");
         } else if (data.text) {
+          console.log("[STT-WS] Transcribed text:", data.text); // Debug log
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({
               text: data.text,

@@ -42,30 +42,22 @@ MIN_ENERGY    = 0.008
 _HP_B, _HP_A = butter(2, 80 / (TARGET_SR / 2), btype='high')
 
 # ── Load models ──
-print("[Silero] Loading VAD...")
 silero_model, _ = torch.hub.load("snakers4/silero-vad", "silero_vad", trust_repo=True)
 silero_model.eval()
-print("[Silero] Ready!")
 
 whisper_model = None
 if STT_ENGINE == "whisper":
     import whisper as _whisper
-    print(f"[Whisper] Loading [{WHISPER_MODEL_NAME}] from {WHISPER_MODEL_DIR} ...")
     # Neu file model da co trong thu muc thi load tu do, khong download lai
     model_file = os.path.join(WHISPER_MODEL_DIR, f"{WHISPER_MODEL_NAME}.pt")
     if os.path.isfile(model_file):
         whisper_model = _whisper.load_model(WHISPER_MODEL_NAME, download_root=WHISPER_MODEL_DIR)
-        print(f"[Whisper] Loaded from local: {model_file}")
     else:
-        print(f"[Whisper] Khong tim thay {model_file}, dang download...")
         os.makedirs(WHISPER_MODEL_DIR, exist_ok=True)
         whisper_model = _whisper.load_model(WHISPER_MODEL_NAME, download_root=WHISPER_MODEL_DIR)
-        print(f"[Whisper] Da luu model vao: {WHISPER_MODEL_DIR}")
-    print("[Whisper] Ready!")
 else:
     import speech_recognition as sr
     _recognizer = sr.Recognizer()
-    print("[Google STT] Ready!")
 
 
 # ── Silero VAD per-connection state ──
@@ -243,7 +235,6 @@ async def handle(websocket):
 
 
 async def main():
-    print(f"[STT-WS] Engine: {STT_ENGINE.upper()}")
     print(f"[STT-WS] Listening on ws://0.0.0.0:{PORT}")
     async with websockets.serve(handle, "0.0.0.0", PORT, ping_interval=60, ping_timeout=120):
         await asyncio.Future()
