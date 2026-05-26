@@ -37,6 +37,8 @@ build/
 tmp/
 temp/
 *.log
+logs/*.log
+logs/*.pid
 
 # ======================
 # Data (VERY IMPORTANT)

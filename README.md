@@ -96,7 +96,7 @@
 ## 🚀 Cài đặt
 
 ### Yêu cầu hệ thống
-- Ubuntu 22.04 / Windows 10+
+- Ubuntu 22.04 / Windows 10+ (WSL2)
 - 8GB RAM (16GB khuyến nghị)
 - Docker & Docker Compose
 - Node.js 18+
@@ -106,20 +106,111 @@
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/SmartVoice-BHXH.git
+git clone https://github.com/thanhptks212k4/SmartVoice-BHXH.git
 cd SmartVoice-BHXH
 
 # 2. Cấu hình environment
 cp .env.example .env
 # Chỉnh sửa .env với API keys của bạn
 
-# 3. Khởi động hệ thống
-bash start.sh
+# 3. Cài đặt dependencies
+npm install                          # Backend dependencies
+cd ui-ux && npm install && cd ..     # Frontend dependencies
+pip install -r AI_Service/requirements.txt  # Python dependencies
 
-# 4. Truy cập ứng dụng
+# 4. Khởi động hệ thống (1 lệnh duy nhất!)
+bash start-all.sh
+
+# 5. Truy cập ứng dụng
 # Frontend: http://localhost:5173
-# Backend: http://localhost:3000
+# Backend:  http://localhost:3000
 ```
+
+### 🎯 Khởi động nhanh
+
+#### Chạy tất cả services với 1 lệnh:
+```bash
+bash start-all.sh
+```
+
+Script sẽ tự động khởi động:
+1. ✅ Docker services (PostgreSQL, Redis, Qdrant)
+2. ✅ Node.js Backend (port 3000)
+3. ✅ STT Service (port 8003)
+4. ✅ Chat Service (RAG + LLM)
+5. ✅ Frontend (port 5173)
+
+#### Dừng tất cả services:
+```bash
+bash stop-all.sh
+```
+
+### 📝 Xem logs
+
+```bash
+# Tất cả logs
+tail -f logs/*.log
+
+# Hoặc từng service
+tail -f logs/backend.log    # Node.js backend
+tail -f logs/stt.log        # STT service
+tail -f logs/chat.log       # Chat service (RAG + LLM)
+tail -f logs/frontend.log   # Vite frontend
+```
+
+### 🔧 Chạy từng service riêng lẻ
+
+Nếu cần chạy từng service riêng:
+
+```bash
+# Docker services
+docker compose up -d
+
+# Backend
+cd AI_Service && npm start
+
+# STT Service
+cd AI_Service/stt_service && python3 worker_stt_ws_server.py
+
+# Chat Service
+cd AI_Service/chat_service && python3 worker.py
+
+# Frontend
+cd ui-ux && npm run dev
+```
+
+### ⚠️ Troubleshooting
+
+**Nếu script không chạy được:**
+
+1. Cấp quyền thực thi:
+   ```bash
+   chmod +x start-all.sh stop-all.sh
+   ```
+
+2. Kiểm tra ports đang sử dụng:
+   ```bash
+   # Linux/Mac
+   lsof -i :3000
+   lsof -i :5173
+   lsof -i :8003
+   
+   # Windows (PowerShell)
+   netstat -ano | findstr :3000
+   ```
+
+3. Kill processes nếu cần:
+   ```bash
+   # Linux/Mac
+   kill $(lsof -t -i:3000)
+   
+   # Windows
+   taskkill /PID <PID> /F
+   ```
+
+**Nếu một service bị lỗi:**
+
+Kiểm tra log file tương ứng trong thư mục `logs/` để xem lỗi chi tiết.
 
 ---
 
