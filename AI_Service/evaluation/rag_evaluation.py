@@ -45,10 +45,15 @@ from config.config import settings
 class TestCase:
     """Một test case cho RAG evaluation"""
     query: str                          # Câu hỏi
-    relevant_chunks: List[str]          # Ground truth: List các chunk IDs đúng
+    relevant_chunks: List[str] = None   # Ground truth: List các chunk IDs đúng
     relevant_dieu: str = None           # Ground truth: Điều liên quan
     ground_truth_answer: str = None     # Ground truth: Câu trả lời mẫu
     category: str = "general"           # Loại câu hỏi
+    
+    def __post_init__(self):
+        """Convert None to empty list for relevant_chunks"""
+        if self.relevant_chunks is None:
+            self.relevant_chunks = []
 
 
 @dataclass
