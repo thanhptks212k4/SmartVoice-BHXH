@@ -1,0 +1,92 @@
+[
+  {
+    "query": "Bảo hiểm xã hội là gì?",
+    "ground_truth_answer": "Bảo hiểm xã hội là hình thức bảo hiểm do Nhà nước tổ chức thực hiện nhằm đảm bảo quyền lợi về vật chất và tinh thần cho người lao động và gia đình họ khi họ gặp rủi ro như ốm đau, thai sản, tai nạn lao động, bệnh nghề nghiệp, hưu trí và tử tuất.",
+    "relevant_dieu": "Điều 1",
+    "category": "định nghĩa"
+  },
+  {
+    "query": "Người lao động đóng BHXH bao nhiêu phần trăm lương?",
+    "ground_truth_answer": "Người lao động đóng 8% lương tháng đóng bảo hiểm xã hội.",
+    "relevant_dieu": "Điều 85",
+    "category": "mức đóng"
+  },
+  {
+    "query": "Người sử dụng lao động đóng BHXH bao nhiêu phần trăm?",
+    "ground_truth_answer": "Người sử dụng lao động đóng 17,5% quỹ tiền lương tháng đóng bảo hiểm xã hội.",
+    "relevant_dieu": "Điều 85",
+    "category": "mức đóng"
+  },
+  {
+    "query": "Tuổi nghỉ hưu của nam giới là bao nhiêu?",
+    "ground_truth_answer": "Nam giới đủ 60 tuổi 3 tháng trở lên (từ năm 2021, tăng dần 3 tháng mỗi năm đến năm 2028 sẽ đạt 62 tuổi).",
+    "relevant_dieu": "Điều 54",
+    "category": "hưu trí"
+  },
+  {
+    "query": "Tuổi nghỉ hưu của nữ giới là bao nhiêu?",
+    "ground_truth_answer": "Nữ giới đủ 55 tuổi 4 tháng trở lên (từ năm 2021, tăng dần 4 tháng mỗi năm đến năm 2035 sẽ đạt 60 tuổi).",
+    "relevant_dieu": "Điều 54",
+    "category": "hưu trí"
+  },
+  {
+    "query": "Điều kiện hưởng lương hưu là gì?",
+    "ground_truth_answer": "Người lao động được hưởng lương hưu khi đủ tuổi nghỉ hưu theo quy định và đã đóng bảo hiểm xã hội đủ 20 năm trở lên.",
+    "relevant_dieu": "Điều 54",
+    "category": "hưu trí"
+  },
+  {
+    "query": "Trợ cấp thai sản được hưởng trong bao lâu?",
+    "ground_truth_answer": "Người lao động nữ được hưởng chế độ thai sản trong 6 tháng, gồm trước khi sinh con 2 tháng và sau khi sinh con 4 tháng.",
+    "relevant_dieu": "Điều 39",
+    "category": "thai sản"
+  },
+  {
+    "query": "Điều kiện hưởng trợ cấp thai sản?",
+    "ground_truth_answer": "Người lao động nữ đã đóng bảo hiểm xã hội từ đủ 6 tháng trở lên trước khi sinh con hoặc nhận nuôi con nuôi dưới 6 tháng tuổi.",
+    "relevant_dieu": "Điều 38",
+    "category": "thai sản"
+  },
+  {
+    "query": "Điều kiện hưởng trợ cấp ốm đau?",
+    "ground_truth_answer": "Người lao động đã đóng bảo hiểm xã hội từ đủ 3 tháng trở lên và có xác nhận của cơ sở khám bệnh, chữa bệnh có thẩm quyền về việc nghỉ việc để điều trị.",
+    "relevant_dieu": "Điều 25",
+    "category": "ốm đau"
+  },
+  {
+    "query": "Mức hưởng trợ cấp ốm đau là bao nhiêu?",
+    "ground_truth_answer": "Mức hưởng trợ cấp ốm đau bằng 75% mức tiền lương, tiền công tháng đóng bảo hiểm xã hội của tháng liền kề trước khi nghỉ việc hưởng chế độ ốm đau.",
+    "relevant_dieu": "Điều 26",
+    "category": "ốm đau"
+  },
+  {
+    "query": "Thời gian đóng BHXH tối thiểu để hưởng chế độ thai sản?",
+    "ground_truth_answer": "Phải đóng bảo hiểm xã hội đủ 6 tháng trở lên trong vòng 12 tháng trước khi sinh con hoặc nhận nuôi con.",
+    "relevant_dieu": "Điều 38",
+    "category": "thai sản"
+  },
+  {
+    "query": "Ai là người tham gia bảo hiểm xã hội bắt buộc?",
+    "ground_truth_answer": "Người lao động làm việc theo hợp đồng lao động không xác định thời hạn, hợp đồng lao động xác định thời hạn, hợp đồng lao động theo mùa vụ hoặc theo một công việc nhất định từ đủ 3 tháng đến dưới 12 tháng.",
+    "relevant_dieu": "Điều 2",
+    "category": "đối tượng"
+  },
+  {
+    "query": "Trợ cấp tai nạn lao động được hưởng khi nào?",
+    "ground_truth_answer": "Người lao động được hưởng trợ cấp tai nạn lao động, bệnh nghề nghiệp khi bị suy giảm khả năng lao động từ 5% trở lên do tai nạn lao động, bệnh nghề nghiệp.",
+    "relevant_dieu": "Điều 43",
+    "category": "tai nạn"
+  },
+  {
+    "query": "Thời gian bảo lưu thời gian đóng BHXH là bao lâu?",
+    "ground_truth_answer": "Thời gian bảo lưu là không quá 1 năm kể từ ngày hết thời hạn đóng bảo hiểm xã hội.",
+    "relevant_dieu": "Điều 81",
+    "category": "quy định"
+  },
+  {
+    "query": "Mức lương hưu tối thiểu là bao nhiêu?",
+    "ground_truth_answer": "Mức lương hưu hằng tháng thấp nhất bằng 1,3 lần mức lương cơ sở tại thời điểm nghỉ hưu.",
+    "relevant_dieu": "Điều 56",
+    "category": "hưu trí"
+  }
+]
